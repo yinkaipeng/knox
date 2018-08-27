@@ -19,6 +19,7 @@ package org.apache.knox.gateway.topology.xml;
 
 import org.apache.commons.digester3.Digester;
 import org.apache.commons.digester3.binder.DigesterLoader;
+import org.apache.knox.gateway.service.definition.CustomDispatch;
 import org.apache.knox.gateway.topology.Application;
 import org.apache.knox.gateway.topology.Provider;
 import org.apache.knox.gateway.topology.Service;
@@ -35,6 +36,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.Collection;
 
 import static org.apache.commons.digester3.binder.DigesterLoader.newLoader;
 import static org.hamcrest.collection.IsMapContaining.hasEntry;
@@ -257,6 +259,58 @@ public class TopologyRulesModuleTest {
     assertThat( app.getUrl(), is("test-app-path") );
     assertThat( app.getUrls().get( 0 ), is("test-app-path") );
     assertThat( app.getParams().get( "test-param-name" ), is( "test-param-value" ) );
+  }
+
+  @Test
+  public void testParseTopologyWithDispatch() throws IOException, SAXException {
+    final Digester digester = loader.newDigester();
+    final String name = "topology-with-dispatch.xml";
+    final URL url = TestUtils.getResourceUrl( TopologyRulesModuleTest.class, name );
+    assertThat( "Failed to find URL for resource " + name, url, notNullValue() );
+    final File file = new File( url.getFile() );
+    final TopologyBuilder topologyBuilder = digester.parse( url );
+    final Topology topology = topologyBuilder.build();
+    assertThat( "Failed to parse resource " + name, topology, notNullValue() );
+    topology.setTimestamp( file.lastModified() );
+
+    final Collection<Service> services =  topology.getServices();
+    final CustomDispatch dispatch = services.iterator().next().getDispatch();
+
+    assertThat( "Failed to find dispatch", dispatch, notNullValue() );
+    assertThat( dispatch.getContributorName(), is("testContributor") );
+    assertThat( dispatch.getHaContributorName(), is("testHAContributor") );
+    assertThat( dispatch.getClassName(), is("org.apache.hadoop.gateway.hbase.HBaseDispatch") );
+    assertThat( dispatch.getHaClassName(), is("testHAClassName") );
+    assertThat( dispatch.getHttpClientFactory(), is("testHttpClientFactory") );
+    assertThat( dispatch.getUseTwoWaySsl(), is(true) );
+    assertThat( dispatch.getParams().size(), is(0) );
+  }
+
+  @Test
+  public void testParseTopologyWithDispatchParameters() throws IOException, SAXException {
+    final Digester digester = loader.newDigester();
+    final String name = "topology-with-dispatch-parameters.xml";
+    final URL url = TestUtils.getResourceUrl( TopologyRulesModuleTest.class, name );
+    assertThat( "Failed to find URL for resource " + name, url, notNullValue() );
+    final File file = new File( url.getFile() );
+    final TopologyBuilder topologyBuilder = digester.parse( url );
+    final Topology topology = topologyBuilder.build();
+    assertThat( "Failed to parse resource " + name, topology, notNullValue() );
+    topology.setTimestamp( file.lastModified() );
+
+    final Collection<Service> services =  topology.getServices();
+    final CustomDispatch dispatch = services.iterator().next().getDispatch();
+
+    assertThat( "Failed to find dispatch", dispatch, notNullValue() );
+    assertThat( dispatch.getContributorName(), is("testContributor") );
+    assertThat( dispatch.getHaContributorName(), is("testHAContributor") );
+    assertThat( dispatch.getClassName(), is("org.apache.hadoop.gateway.hbase.HBaseDispatch") );
+    assertThat( dispatch.getHaClassName(), is("testHAClassName") );
+    assertThat( dispatch.getHttpClientFactory(), is("testHttpClientFactory") );
+    assertThat( dispatch.getUseTwoWaySsl(), is(true) );
+    assertThat( dispatch.getParams().size(), is(2) );
+    assertThat( dispatch.getParams().get("abc"), is("def") );
+    assertThat( dispatch.getParams().get("ghi"), is("123") );
   }
 
 }
