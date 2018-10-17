@@ -55,6 +55,7 @@ public class KnoxTokenCredentialCollector extends AbstractCredentialCollector {
         value = attrs.get("access_token");
         targetUrl = attrs.get("target_url");
         tokenType = attrs.get("token_type");
+
         Date expires = new Date(Long.parseLong(attrs.get("expires_in")));
         if (expires.before(new Date())) {
           throw new CredentialCollectionException("Cached knox token has expired. Please relogin through knoxinit.");

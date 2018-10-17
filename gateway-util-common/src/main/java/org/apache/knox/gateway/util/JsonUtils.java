@@ -49,13 +49,12 @@ public class JsonUtils {
     }
     return json;
   }
-  
+
   public static Map<String, String> getMapFromJsonString(String json) {
     Map<String, String> map = null;
     JsonFactory factory = new JsonFactory(); 
-    ObjectMapper mapper = new ObjectMapper(factory); 
-    TypeReference<HashMap<String,String>> typeRef 
-          = new TypeReference<HashMap<String,String>>() {}; 
+    ObjectMapper mapper = new ObjectMapper(factory);
+    TypeReference<Map<String, String>> typeRef = new TypeReference<Map<String, String>>() {};
     try {
       map = mapper.readValue(json, typeRef);
     } catch (JsonParseException e) {
