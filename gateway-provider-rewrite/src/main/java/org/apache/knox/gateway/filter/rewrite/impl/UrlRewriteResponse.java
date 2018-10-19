@@ -17,6 +17,7 @@
  */
 package org.apache.knox.gateway.filter.rewrite.impl;
 
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.knox.gateway.filter.GatewayResponseWrapper;
 import org.apache.knox.gateway.filter.ResponseStreamer;
 import org.apache.knox.gateway.filter.rewrite.api.UrlRewriteFilterContentDescriptor;
@@ -25,6 +26,7 @@ import org.apache.knox.gateway.filter.rewrite.api.UrlRewriteServletFilter;
 import org.apache.knox.gateway.filter.rewrite.api.UrlRewriteStreamFilterFactory;
 import org.apache.knox.gateway.filter.rewrite.api.UrlRewriter;
 import org.apache.knox.gateway.filter.rewrite.i18n.UrlRewriteMessages;
+import org.apache.knox.gateway.filter.rewrite.spi.UrlRewriteStreamFilter;
 import org.apache.knox.gateway.i18n.messages.MessagesFactory;
 import org.apache.knox.gateway.util.MimeTypes;
 import org.apache.knox.gateway.util.Urls;
@@ -46,12 +48,12 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static org.apache.knox.gateway.filter.rewrite.impl.UrlRewriteUtil.getRewriteFilterConfig;
@@ -92,8 +94,7 @@ public class UrlRewriteResponse extends GatewayResponseWrapper implements Params
   private String xForwardedPort;
   private String xForwardedScheme;
 
-  public UrlRewriteResponse( FilterConfig config, HttpServletRequest request, HttpServletResponse response )
-      throws IOException {
+  public UrlRewriteResponse( FilterConfig config, HttpServletRequest request, HttpServletResponse response ) {
     super( response );
     this.rewriter = UrlRewriteServletContextListener.getUrlRewriter( config.getServletContext() );
     this.config = config;
@@ -150,28 +151,9 @@ public class UrlRewriteResponse extends GatewayResponseWrapper implements Params
 
   @Override
   public void streamResponse( InputStream input, OutputStream output ) throws IOException {
-    InputStream  inStream;
-    OutputStream outStream;
-
-    boolean isGzip = false;
-
-    BufferedInputStream inBuffer = new BufferedInputStream(input, STREAM_BUFFER_SIZE);
-
-    try {
-      // Use this way to check whether the input stream is gzip compressed, in case
-      // the content encoding header is unknown, as it could be unset in inbound response
-      inBuffer.mark(STREAM_BUFFER_SIZE);
-      inStream = new GZIPInputStream(new GZIPInputStreamHelperInputStream(inBuffer), STREAM_BUFFER_SIZE);
-      isGzip = true;
-    } catch (IOException e) {
-      // Not proper gzip content
-      inBuffer.reset();
-      inStream = inBuffer;
-    }
-
     MimeType mimeType = getMimeType();
     UrlRewriteFilterContentDescriptor filterContentConfig =
-                                                getRewriteFilterConfig(rewriter.getConfig(), bodyFilterName, mimeType);
+        getRewriteFilterConfig(rewriter.getConfig(), bodyFilterName, mimeType);
     if (filterContentConfig != null) {
       String asType = filterContentConfig.asType();
       if ( asType != null && asType.trim().length() > 0 ) {
@@ -179,18 +161,40 @@ public class UrlRewriteResponse extends GatewayResponseWrapper implements Params
       }
     }
 
-    InputStream filteredInput = UrlRewriteStreamFilterFactory.create(mimeType,
-                                                                     null,
-                                                                     inStream,
-                                                                     rewriter,
-                                                                     this,
-                                                                     UrlRewriter.Direction.OUT,
-                                                                     filterContentConfig);
-    outStream = (isGzip) ? new GZIPOutputStream(output, STREAM_BUFFER_SIZE) : output;
+    UrlRewriteStreamFilter filter = UrlRewriteStreamFilterFactory.create(mimeType, null);
+
+    final InputStream inStream;
+    final OutputStream outStream;
+    if( filter != null ) {
+      // Use this way to check whether the input stream is gzip compressed, in case
+      // the content encoding header is unknown, as it could be unset in inbound response
+      boolean isGzip = false;
+      final BufferedInputStream inBuffer = new BufferedInputStream(input, STREAM_BUFFER_SIZE);
+      inBuffer.mark(2);
+      byte [] signature = new byte[2];
+      int len = inBuffer.read(signature);
+      if( len == 2 && signature[ 0 ] == (byte) 0x1f && signature[ 1 ] == (byte) 0x8b ) {
+        isGzip = true;
+      }
+      inBuffer.reset();
+
+      final InputStream unFilteredStream;
+      if(isGzip) {
+        unFilteredStream = new GzipCompressorInputStream(inBuffer, true);
+      } else {
+        unFilteredStream = inBuffer;
+      }
+      String charset = MimeTypes.getCharset( mimeType, StandardCharsets.ISO_8859_1.name() );
+      inStream = filter.filter( unFilteredStream, charset, rewriter, this, UrlRewriter.Direction.OUT, filterContentConfig );
+      outStream = (isGzip) ? new GZIPOutputStream(output, STREAM_BUFFER_SIZE) : output;
+    } else {
+      inStream = input;
+      outStream = output;
+    }
+
     try {
-      IOUtils.copyLarge(filteredInput, outStream, new byte[STREAM_BUFFER_SIZE]);
+      IOUtils.copy(inStream, outStream, STREAM_BUFFER_SIZE);
     } finally {
-      //KNOX-685: outStream.flush();
       outStream.close();
     }
   }
@@ -336,78 +340,4 @@ public class UrlRewriteResponse extends GatewayResponseWrapper implements Params
       xForwardedPort = Integer.toString( request.getLocalPort() );
     }
   }
-
-  /**
-   * This InputStream wraps another InputStream to override the available() behavior. This is to fulfill
-   * GZIPInputStream's expectation of the available() method, for which the behavior actually varies across InputStream
-   * implementations; in some cases, it causes GZIPInputStream to terminate prematurely, resulting in partial reads.
-   *
-   * Guaranteeing that the available() method always returns a value greater than zero forces the GZIPInputStream to
-   * continue reading from the underlying InputStream until it actually reaches the end of the stream.
-   */
-  private static class GZIPInputStreamHelperInputStream extends InputStream {
-
-    private InputStream delegate;
-
-    GZIPInputStreamHelperInputStream(InputStream delegate) {
-      this.delegate = delegate;
-    }
-
-    /**
-     * @return The delegate's available() result if it's > 0, otherwise 1.
-     */
-    @Override
-    public int available() throws IOException {
-      int available = delegate.available();
-      if (available <= 1) {
-        available = 1;
-      }
-      return available;
-    }
-
-    @Override
-    public int read() throws IOException {
-      return delegate.read();
-    }
-
-    @Override
-    public int read(byte[] b) throws IOException {
-      return delegate.read(b);
-    }
-
-    @Override
-    public int read(byte[] b, int off, int len) throws IOException {
-      return delegate.read(b, off, len);
-    }
-
-    @Override
-    public long skip(long n) throws IOException {
-      return delegate.skip(n);
-    }
-
-    @Override
-    public void close() throws IOException {
-      delegate.close();
-    }
-
-    @Override
-    public synchronized void mark(int readlimit) {
-      if (markSupported()) {
-        delegate.mark(readlimit);
-      }
-    }
-
-    @Override
-    public synchronized void reset() throws IOException {
-      if (markSupported()) {
-        delegate.reset();
-      }
-    }
-
-    @Override
-    public boolean markSupported() {
-      return delegate.markSupported();
-    }
-  }
-
 }

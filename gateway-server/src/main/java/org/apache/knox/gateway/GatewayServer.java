@@ -66,7 +66,6 @@ import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.server.handler.RequestLogHandler;
-import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.webapp.Configuration;
@@ -424,19 +423,9 @@ public class GatewayServer {
     CorrelationHandler correlationHandler = new CorrelationHandler();
     correlationHandler.setHandler( traceHandler );
 
-    /* KNOX-732: Handler for GZip compression */
-    GzipHandler gzipHandler = new GzipHandler();
-    String[] mimeTypes = {};
-    if (config.getMimeTypesToCompress() != null
-        && !config.getMimeTypesToCompress().isEmpty()) {
-      mimeTypes = (String[]) config.getMimeTypesToCompress().toArray();
-    }
-    gzipHandler.addIncludedMimeTypes(mimeTypes);
-    gzipHandler.setHandler(correlationHandler);
-
     // Used to correct the {target} part of request with Topology Port Mapping feature
     final PortMappingHelperHandler portMappingHandler = new PortMappingHelperHandler(config);
-    portMappingHandler.setHandler(gzipHandler);
+    portMappingHandler.setHandler(correlationHandler);
 
      // If topology to port mapping feature is enabled then we add new Handler {RequestForwardHandler}
      // to the chain, this handler listens on the configured port (in gateway-site.xml)
