@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,17 +17,18 @@
  */
 package org.apache.knox.gateway.shell;
 
-public class HadoopException extends KnoxShellException {
+public class KnoxShellException extends RuntimeException {
 
-  public HadoopException(String message) {
-    super(message);
+  public KnoxShellException( String message ) {
+    super( message );
   }
 
-  public HadoopException( Throwable throwable ) {
+  public KnoxShellException( Throwable throwable ) {
     super( throwable );
   }
 
-  public HadoopException( String message, Throwable throwable ) {
+  public KnoxShellException( String message, Throwable throwable ) {
     super( message, throwable );
   }
+
 }

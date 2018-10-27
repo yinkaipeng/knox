@@ -17,17 +17,17 @@
  */
 package org.apache.knox.gateway.shell.workflow;
 
-import org.apache.knox.gateway.shell.Hadoop;
+import org.apache.knox.gateway.shell.KnoxSession;
 
 public class Workflow {
 
   static final String SERVICE_PATH = "/oozie/v1";
 
-  public static Submit.Request submit( Hadoop session ) {
+  public static Submit.Request submit( KnoxSession session ) {
     return new Submit.Request( session );
   }
 
-  public static Status.Request status( Hadoop session ) {
+  public static Status.Request status( KnoxSession session ) {
     return new Status.Request( session );
   }
 
