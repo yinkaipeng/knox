@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -78,7 +79,7 @@ public class WhitelistUtilsTest {
                                            "host0.test.org",
                                            serviceRole);
     assertNotNull(whitelist);
-    assertTrue(whitelist.contains("\\.test\\.org"));
+    assertEquals("^\\/.*$;^https?:\\/\\/(.+\\.test\\.org):[0-9]+\\/?.*$", whitelist); // KNOX-1577
   }
 
   @Test
