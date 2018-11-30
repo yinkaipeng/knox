@@ -18,7 +18,6 @@
 package org.apache.knox.gateway.util.urltemplate;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -374,7 +373,7 @@ public class Matcher<V> {
 
   private class MatchParams implements Params {
 
-    private Map<String,List<String>> map = new HashMap<>();
+    private Map<String,List<String>> map = new LinkedHashMap<>();
 
     public Set<String> getNames() {
       return map.keySet();

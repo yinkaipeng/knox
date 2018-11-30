@@ -36,11 +36,11 @@ import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 
@@ -73,21 +73,15 @@ private static SpiGatewayMessages log = MessagesFactory.get( SpiGatewayMessages.
   
   @Override
   public Map<String, String[]> getParameterMap() {
-    Map<String, String[]> map = null;
-    try {
-      map = convertValuesToStringArrays(getParams());
-    } catch (UnsupportedEncodingException e) {
-      log.unableToGetParamsFromQueryString(e);
-    }
-    return map;
+    return convertValuesToStringArrays();
   }
 
-  private Map<String, String[]> convertValuesToStringArrays(Map<String, List<String>> params) {
-    Map<String, String[]> arrayMap = new HashMap<String, String[]>();
-    String name = null;
+  private Map<String, String[]> convertValuesToStringArrays() {
+    Map<String, String[]> arrayMap = new LinkedHashMap<>();
+    String name;
     Enumeration<String> names = getParameterNames();
     while (names.hasMoreElements()) {
-      name = (String) names.nextElement();
+      name = names.nextElement();
       arrayMap.put(name, getParameterValues(name));
     }
     return arrayMap;
@@ -100,7 +94,7 @@ private static SpiGatewayMessages log = MessagesFactory.get( SpiGatewayMessages.
     try {
       params = getParams();
       if (params == null) {
-        params = new HashMap<>();
+        params = new LinkedHashMap<>();
       }
       e = Collections.enumeration((Collection<String>) params.keySet());
     } catch (UnsupportedEncodingException e1) {
@@ -117,7 +111,7 @@ private static SpiGatewayMessages log = MessagesFactory.get( SpiGatewayMessages.
     try {
       params = getParams();
       if (params == null) {
-        params = new HashMap<>();
+        params = new LinkedHashMap<>();
       }
       p = (String[]) params.get(name).toArray(p);
     } catch (UnsupportedEncodingException e) {
@@ -135,7 +129,7 @@ private static SpiGatewayMessages log = MessagesFactory.get( SpiGatewayMessages.
         params = HttpUtils.splitQuery( qString );
       }
       else {
-        params = new HashMap<>();
+        params = new LinkedHashMap<>();
       }
     }
     else {
@@ -161,7 +155,7 @@ private static SpiGatewayMessages log = MessagesFactory.get( SpiGatewayMessages.
     try {
       params = getParams();
       if (params == null) {
-        params = new HashMap<>();
+        params = new LinkedHashMap<>();
       }
       ArrayList<String> al = new ArrayList<String>();
       al.add(username);
@@ -237,7 +231,7 @@ private static SpiGatewayMessages log = MessagesFactory.get( SpiGatewayMessages.
       String body = IOUtils.toString( super.getInputStream(), encoding );
       Map<String, List<String>> params = getParams( body );
       if (params == null) {
-        params = new HashMap<>();
+        params = new LinkedHashMap<>();
       }
       body = urlEncode( params, encoding );
       // ASCII is OK here because the urlEncode about should have already escaped

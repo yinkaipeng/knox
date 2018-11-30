@@ -18,11 +18,11 @@
 package org.apache.knox.gateway.util;
 
 import java.io.UnsupportedEncodingException;
-import java.net.URL;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
@@ -31,7 +31,7 @@ public class HttpUtils {
 
   public static Map<String, List<String>> splitQuery(String queryString)
       throws UnsupportedEncodingException {
-    final Map<String, List<String>> queryPairs = new HashMap<String, List<String>>();
+    final Map<String, List<String>> queryPairs = new LinkedHashMap<>();
     if (queryString == null || queryString.trim().isEmpty()) {
       return queryPairs;
     }
@@ -42,15 +42,15 @@ public class HttpUtils {
       if (!queryPairs.containsKey(key)) {
         queryPairs.put(key, new ArrayList<String>());
       }
-      final String value = idx > 0 && pair.length() > idx + 1 
-          ? URLDecoder.decode(pair.substring(idx + 1), "UTF-8") : "";
-      queryPairs.get(key).add(value);
-    }
+      final String value = idx > 0 && pair.length() > idx + 1
+          ? URLDecoder.decode(pair.substring(idx + 1), StandardCharsets.UTF_8.name()) : "";
+        queryPairs.get(key).add(value);
+      }
     return queryPairs;
   }
 
   public static Map<String,String[]> parseQueryString( String queryString ) {
-    Map<String,String[]> map = new HashMap<>();
+    Map<String,String[]> map = new LinkedHashMap<>();
     if( queryString != null && !queryString.isEmpty() ) {
       StringTokenizer parser = new StringTokenizer( queryString, "&?;=", true );
       String name = null;
@@ -95,7 +95,7 @@ public class HttpUtils {
     return map;
   }
 
-  private static final String urlDecodeUtf8( String s ) {
+  private static String urlDecodeUtf8(String s ) {
     if( s != null ) {
       try {
         s = URLDecoder.decode( s, "UTF-8" );
@@ -118,5 +118,4 @@ public class HttpUtils {
     }
     map.put( name, values );
   }
-
 }
