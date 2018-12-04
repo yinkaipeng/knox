@@ -1,3 +1,7 @@
+package org.apache.knox.gateway.ShellTest
+
+import org.apache.knox.gateway.shell.Hadoop
+
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,21 +19,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.knox.gateway.shell;
+import org.apache.knox.gateway.shell.KnoxSession
+import org.apache.knox.gateway.shell.hdfs.Hdfs
 
-import org.apache.http.HttpResponse;
+dataFile = "README"
+username = "guest"
+dataDir = "/user/" + username + "/example"
 
-public class ErrorResponse extends RuntimeException {
+/* Unit test will add 'gateway' and 'jaasConf' binding programmatically */
+session = KnoxSession.kerberosLogin(gateway, jaasConf, krb5conf, true)
 
-  HttpResponse response;
+status = Hdfs.status(session).file( "/" ).now().string
 
-  ErrorResponse(String text, HttpResponse response ) {
-    super( text + response.getStatusLine() );
-    this.response = response;
-  }
+Hdfs.put( session ).file( file ).to( dataDir + "/" + dataFile ).now()
+Hdfs.put( session ).file( file ).to( dataDir + "/" + dataFile ).overwrite(true).permission(777).now()
 
-  public HttpResponse getResponse() {
-    return response;
-  }
+fetchedFile = Hdfs.get( session ).from( dataDir + "/" + dataFile).now().string
 
-}
+session.shutdown()
