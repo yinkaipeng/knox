@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
+import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
@@ -46,6 +47,23 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.util.Properties;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_BLOCK_ACCESS_TOKEN_ENABLE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATA_ENCRYPTION_ALGORITHM_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HTTP_POLICY_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_JOURNALNODE_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_JOURNALNODE_KERBEROS_INTERNAL_SPNEGO_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_JOURNALNODE_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_JOURNALNODE_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL_KEY;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -54,20 +72,8 @@ import static org.junit.Assert.assertTrue;
  */
 @Category(ReleaseTest.class)
 public class SecureKnoxShellTest {
-
   private static final String SCRIPT = "SecureWebHdfsPutGet.groovy";
-  /**
-   * Referring {@link MiniKdc} as {@link Object} to prevent the class loader
-   * from trying to load it before @BeforeClass annotation is called. Need to
-   * play this game because {@link MiniKdc} is not compatible with Java 7 so if
-   * we detect Java 7 we quit the test.
-   * <p>
-   * As result we need to up cast this object to {@link MiniKdc} every place we
-   * use it.
-   *
-   * @since 0.10
-   */
-  private static Object kdc;
+  private static MiniKdc kdc;
   private static String userName;
   private static HdfsConfiguration configuration;
   private static int nameNodeHttpPort;
@@ -83,26 +89,12 @@ public class SecureKnoxShellTest {
   private static MiniDFSCluster miniDFSCluster;
   private static GatewayTestDriver driver = new GatewayTestDriver();
 
-  /**
-   * Test should run if java major version is greater or equal to this
-   * property.
-   *
-   * @since 0.10
-   */
-  private static int JAVA_MAJOR_VERSION_FOR_TEST = 8;
-
   public SecureKnoxShellTest() {
     super();
   }
 
   @BeforeClass
   public static void setupSuite() throws Exception {
-
-    /*
-     * Run the test only if the jre version matches the one we want, see
-     * KNOX-769
-     */
-    org.junit.Assume.assumeTrue(isJreVersionOK());
     baseDir = new File(
         KeyStoreTestUtil.getClasspathDir(SecureKnoxShellTest.class));
     ticketCache = new File(
@@ -116,19 +108,20 @@ public class SecureKnoxShellTest {
     System.setProperty(MiniDFSCluster.PROP_TEST_BUILD_DATA,
         baseDir.getAbsolutePath());
 
+    initKdc();
     miniDFSCluster = new MiniDFSCluster.Builder(configuration)
         .nameNodePort(TestUtils.findFreePort())
         .nameNodeHttpPort(nameNodeHttpPort).numDataNodes(2).format(true)
         .racks(null).build();
 
-    initKdc();
     setupKnox(keytab, hdfsPrincipal);
   }
 
   private static void initKdc() throws Exception {
+
     final Properties kdcConf = MiniKdc.createConf();
     kdc = new MiniKdc(kdcConf, baseDir);
-    ((MiniKdc) kdc).start();
+    kdc.start();
 
     userName = UserGroupInformation
         .createUserForTesting("guest", new String[] { "users" }).getUserName();
@@ -136,15 +129,42 @@ public class SecureKnoxShellTest {
     keytab = keytabFile.getAbsolutePath();
     // Windows will not reverse name lookup "127.0.0.1" to "localhost".
     final String krbInstance = Path.WINDOWS ? "127.0.0.1" : "localhost";
-    ((MiniKdc) kdc).createPrincipal(keytabFile, userName + "/" + krbInstance,
+    kdc.createPrincipal(keytabFile, userName + "/" + krbInstance,
         "HTTP/" + krbInstance);
 
     hdfsPrincipal =
-        userName + "/" + krbInstance + "@" + ((MiniKdc) kdc).getRealm();
-    spnegoPrincipal = "HTTP/" + krbInstance + "@" + ((MiniKdc) kdc).getRealm();
+        userName + "/" + krbInstance + "@" + kdc.getRealm();
+    spnegoPrincipal = "HTTP/" + krbInstance + "@" + kdc.getRealm();
 
-    krb5conf = ((MiniKdc) kdc).getKrb5conf().getAbsolutePath();
+    configuration.set(DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY, hdfsPrincipal);
+    configuration.set(DFS_NAMENODE_KEYTAB_FILE_KEY, keytab);
+    configuration.set(DFS_DATANODE_KERBEROS_PRINCIPAL_KEY, hdfsPrincipal);
+    configuration.set(DFS_DATANODE_KEYTAB_FILE_KEY, keytab);
+    configuration.set(DFS_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL_KEY, spnegoPrincipal);
+    configuration.set(DFS_JOURNALNODE_KEYTAB_FILE_KEY, keytab);
+    configuration.set(DFS_JOURNALNODE_KERBEROS_PRINCIPAL_KEY, hdfsPrincipal);
+    configuration.set(DFS_JOURNALNODE_KERBEROS_INTERNAL_SPNEGO_PRINCIPAL_KEY, spnegoPrincipal);
+    configuration.setBoolean(DFS_BLOCK_ACCESS_TOKEN_ENABLE_KEY, true);
+    configuration.set(DFS_DATA_ENCRYPTION_ALGORITHM_KEY, "authentication");
+    configuration.set(DFS_HTTP_POLICY_KEY, HttpConfig.Policy.HTTP_AND_HTTPS.name());
+    configuration.set(DFS_NAMENODE_HTTPS_ADDRESS_KEY, "localhost:0");
+    configuration.set(DFS_DATANODE_HTTPS_ADDRESS_KEY, "localhost:0");
+    configuration.set(DFS_JOURNALNODE_HTTPS_ADDRESS_KEY, "localhost:0");
+    configuration.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 10);
+    configuration.set("hadoop.proxyuser." + userName + ".hosts", "*");
+    configuration.set("hadoop.proxyuser." + userName + ".groups", "*");
+    configuration.setBoolean("dfs.permissions", true);
 
+    String keystoresDir = baseDir.getAbsolutePath();
+    File sslClientConfFile = new File(keystoresDir + "/ssl-client.xml");
+    File sslServerConfFile = new File(keystoresDir + "/ssl-server.xml");
+    KeyStoreTestUtil.setupSSLConfig(keystoresDir, keystoresDir, configuration, false);
+    configuration.set(DFS_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY,
+        sslClientConfFile.getName());
+    configuration.set(DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
+        sslServerConfFile.getName());
+
+    krb5conf = kdc.getKrb5conf().getAbsolutePath();
   }
 
   /**
@@ -168,13 +188,17 @@ public class SecureKnoxShellTest {
 
   @AfterClass
   public static void cleanupSuite() throws Exception {
-    /* No need to clean up if we did not start anything */
-    if (isJreVersionOK()) {
-      ((MiniKdc) kdc).stop();
-      Files.deleteIfExists(ticketCache.toPath());
+
+    if(kdc != null) {
+      kdc.stop();
+    }
+    if(miniDFSCluster != null) {
       miniDFSCluster.shutdown();
+    }
+    if(driver != null) {
       driver.cleanup();
     }
+
   }
 
   private static File setupJaasConf(File baseDir, String keyTabFile,
@@ -289,28 +313,6 @@ public class SecureKnoxShellTest {
         .configure(ClassLoader.getSystemResource("log4j.properties"));
   }
 
-  /**
-   * Check whether java version is >= {@link #JAVA_MAJOR_VERSION_FOR_TEST}
-   *
-   * @return
-   * @since 0.10
-   */
-  public static boolean isJreVersionOK() {
-
-    final String jreVersion = System.getProperty("java.version");
-    int majorVersion = Integer.parseInt(String.valueOf(jreVersion.charAt(2)));
-
-    if (majorVersion >= JAVA_MAJOR_VERSION_FOR_TEST) {
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Test Kerberos login using KnoxShell using keytab.
-   *
-   * @throws Exception
-   */
   @Test
   public void testCachedTicket() throws Exception {
     setupLogging();
@@ -327,8 +329,6 @@ public class SecureKnoxShellTest {
 
   /**
    * Do the heavy lifting here.
-   *
-   * @throws Exception
    */
   private void webhdfsPutGet() throws Exception {
     DistributedFileSystem fileSystem = miniDFSCluster.getFileSystem();
