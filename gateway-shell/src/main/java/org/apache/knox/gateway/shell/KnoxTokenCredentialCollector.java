@@ -79,7 +79,9 @@ public class KnoxTokenCredentialCollector extends AbstractCredentialCollector {
       Path path = Paths.get(knoxtoken.toURI());
       List<String> lines;
       lines = Files.readAllLines(path, StandardCharsets.UTF_8);
-      line = lines.get(0);
+      if (!lines.isEmpty()) {
+        line = lines.get(0);
+      }
     }
 
     return line;

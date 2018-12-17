@@ -1,4 +1,5 @@
 /*
+<<<<<<< HEAD
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,12 +19,19 @@
 package org.apache.knox.gateway.shell;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
+import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.knox.gateway.util.JsonUtils;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class KnoxTokenCredentialCollectorTest {
@@ -44,6 +52,77 @@ public class KnoxTokenCredentialCollectorTest {
       + "Q0ODMxNTI3fQ.gcIuNQN1_6dF6guk_7-QZo13xQMtlhtrc53H0lBzhj4Ft8OjUw-QNNMz6-bohz5Al"
       + "XBF6r_whfqFBm8MZUHIh8-hmqt91458acqR3jtJNDrjs5cv2ExaycK40KgyX58cnh6wfph5RLgiAo4"
       + "j3zRSOaykZBq8W1DhYliXkRBFm1w";
+
+  private static final File tokenCacheBackup = new File("tokenCacheBackup.bin");
+
+  @BeforeClass
+  public static void backupTokenCache() throws Exception {
+    File tokenCacheFile = getTokenCacheFile();
+    if (tokenCacheFile.exists()) {
+      FileUtils.copyFile(getTokenCacheFile(), tokenCacheBackup);
+    }
+  }
+
+  @AfterClass
+  public static void restoreTokenCache() throws Exception {
+    if (tokenCacheBackup.exists()) {
+      FileUtils.moveFile(tokenCacheBackup, getTokenCacheFile());
+      tokenCacheBackup.delete();
+    }
+  }
+
+  private static File getTokenCacheFile() throws Exception {
+    return new File(System.getProperty("user.home"), getTokenCacheFileName());
+  }
+
+  private static String getTokenCacheFileName() throws Exception {
+    Field f = KnoxTokenCredentialCollector.class.getDeclaredField("KNOXTOKENCACHE");
+    f.setAccessible(true);
+    Object fieldValue = f.get(KnoxTokenCredentialCollector.class);
+    assertTrue(fieldValue instanceof String);
+    return (String) fieldValue;
+  }
+
+  /**
+   * KNOX-1680
+   */
+  @Test
+  public void testEmptyTokenCache() {
+
+    // Delete the existing token cache file, and replace it with an empty one
+    try {
+      File tokenCacheFile = getTokenCacheFile();
+      if (tokenCacheFile.exists()) {
+        tokenCacheFile.delete();
+      }
+      assertTrue(tokenCacheFile.createNewFile());
+    } catch (Exception e) {
+      // If the empty file could not be created, then this test does not make
+      // any sense.
+      fail("Could not create empty Knox token cache file: " + e.getMessage());
+    }
+
+    boolean caughtCredentialCollectionException = false;
+
+    // Attempt to collect the Knox token
+    KnoxTokenCredentialCollector collector = new KnoxTokenCredentialCollector();
+    try {
+      collector.collect();
+    } catch (CredentialCollectionException e) {
+      // Expected
+      caughtCredentialCollectionException = true;
+    } catch (Exception e) {
+      fail("Unexpected exception: " + e.getMessage());
+    } finally {
+      try {
+        getTokenCacheFile().delete();
+      } catch (Exception e) {
+        // Ignore
+      }
+    }
+
+    assertTrue("Expected exception not thrown.", caughtCredentialCollectionException);
+  }
 
   @Test
   public void testParsingPublicCertPem() throws Exception {
@@ -74,4 +153,5 @@ public class KnoxTokenCredentialCollectorTest {
     assertEquals(token.getEndpointClientCertPEM(), map.get("endpoint_public_cert"));
     assertEquals(token.getExpiresIn(), map.get("expires_in"));
   }
+
 }
