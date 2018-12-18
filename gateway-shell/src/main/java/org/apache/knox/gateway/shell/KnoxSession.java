@@ -18,6 +18,8 @@
 package org.apache.knox.gateway.shell;
 
 import com.sun.security.auth.callback.TextCallbackHandler;
+
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHost;
@@ -49,12 +51,15 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.ssl.SSLContexts;
+import org.apache.knox.gateway.i18n.messages.MessagesFactory;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
 import javax.security.auth.Subject;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
+
+import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
@@ -71,6 +76,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
 import java.security.PrivilegedAction;
 import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -90,7 +97,10 @@ public class KnoxSession implements Closeable {
   private static final String KNOX_CLIENT_TRUSTSTORE_DIR = "KNOX_CLIENT_TRUSTSTORE_DIR";
   private static final String DEFAULT_JAAS_FILE = "/jaas.conf";
   public static final String JGSS_LOGIN_MOUDLE = "com.sun.security.jgss.initiate";
+  public static final String END_CERTIFICATE = "-----END CERTIFICATE-----\n";
+  public static final String BEGIN_CERTIFICATE = "-----BEGIN CERTIFICATE-----\n";
 
+  private static final KnoxShellMessages LOG = MessagesFactory.get(KnoxShellMessages.class);
   private boolean isKerberos = false;
   private LoginContext lc = null;
 
@@ -125,6 +135,10 @@ public class KnoxSession implements Closeable {
 
     return new KnoxSession(ClientContext.with(username, password, url)
         .connection().withTruststore(truststoreLocation, truststorePass).end());
+  }
+
+  public static KnoxSession login(ClientContext context) throws URISyntaxException {
+    return new KnoxSession(context);
   }
 
   /**
@@ -303,9 +317,35 @@ public class KnoxSession implements Closeable {
 
   }
 
+  protected X509Certificate generateCertificateFromBytes(byte[] certBytes) throws CertificateException {
+    CertificateFactory factory = CertificateFactory.getInstance("X.509");
+    return (X509Certificate)factory.generateCertificate(new ByteArrayInputStream(certBytes));
+  }
+
   private KeyStore getTrustStore(ClientContext clientContext) throws GeneralSecurityException {
     KeyStore ks = null;
     String truststorePass = null;
+
+    // if a PEM file was provided create a keystore from that and use
+    // it as the truststore
+    String pem = clientContext.connection().endpointPublicCertPem();
+    if (pem != null) {
+      // strip delimiters
+      if (pem.contains("BEGIN")) {
+        pem = pem.substring(BEGIN_CERTIFICATE.length()-1,
+            pem.indexOf(END_CERTIFICATE.substring(0, END_CERTIFICATE.length()-1)));
+      }
+      try {
+        byte[] bytes = Base64.decodeBase64(pem);
+        KeyStore keystore = KeyStore.getInstance("JKS");
+        keystore.load(null);
+        keystore.setCertificateEntry("knox-gateway", generateCertificateFromBytes(bytes));
+
+        return keystore;
+      } catch (IOException e) {
+        LOG.unableToLoadProvidedPEMEncodedTrustedCert(e);
+      }
+    }
 
     discoverTruststoreDetails(clientContext);
 

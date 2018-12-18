@@ -37,6 +37,12 @@
         </dependency>
 
         <dependency>
+            <groupId>${gateway-group}</groupId>
+            <artifactId>gateway-test-utils</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
             <groupId>org.codehaus.groovy</groupId>
             <artifactId>groovy</artifactId>
         </dependency>

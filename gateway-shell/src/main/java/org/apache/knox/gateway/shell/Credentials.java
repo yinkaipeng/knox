@@ -36,6 +36,18 @@ public class Credentials {
     return this;
   }
 
+  public Credentials add(CredentialCollector collector, String prompt, String name)
+      throws CredentialCollectionException {
+    if (collector == null) {
+      throw new CredentialCollectionException("Null CredentialCollector cannot be added.");
+    }
+    collector.setPrompt(prompt);
+    collector.setName(name);
+    collectors.add(collector);
+
+    return this;
+  }
+
   public void collect() throws CredentialCollectionException {
     for (CredentialCollector collector : collectors) {
       collector.collect();

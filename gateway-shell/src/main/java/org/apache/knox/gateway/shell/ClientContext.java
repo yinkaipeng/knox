@@ -31,7 +31,7 @@ public class ClientContext {
   private final ConnectionContext connectionContext;
   private final KerberosContext kerberos;
 
-  private ClientContext() {
+  ClientContext() {
     configuration = new MapConfiguration(new HashMap<>());
     poolContext = new PoolContext(this);
     socketContext = new SocketContext(this);
@@ -179,6 +179,11 @@ public class ClientContext {
       return this;
     }
 
+    public ConnectionContext withPublicCertPem(final String endpointPublicCertPem) {
+          configuration.addProperty("endpointPublicCertPem", endpointPublicCertPem);
+          return this;
+    }
+
     public String truststoreLocation() {
       return configuration.getString("truststoreLocation");
     }
@@ -186,6 +191,10 @@ public class ClientContext {
     public String truststorePass() {
       return configuration.getString("truststorePass");
     }
+
+	  public String endpointPublicCertPem() {
+      return configuration.getString("endpointPublicCertPem");
+	  }
   }
 
   /**

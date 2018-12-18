@@ -17,7 +17,11 @@
  */
 package org.apache.knox.gateway.service.knoxtoken;
 
+import java.io.UnsupportedEncodingException;
+import java.security.KeyStoreException;
 import java.security.Principal;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Map;
@@ -33,8 +37,12 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+
+import org.apache.commons.codec.binary.Base64;
 import org.apache.knox.gateway.i18n.messages.MessagesFactory;
 import org.apache.knox.gateway.services.GatewayServices;
+import org.apache.knox.gateway.services.security.KeystoreService;
+import org.apache.knox.gateway.services.security.KeystoreServiceException;
 import org.apache.knox.gateway.services.security.token.JWTokenAuthority;
 import org.apache.knox.gateway.services.security.token.TokenServiceException;
 import org.apache.knox.gateway.services.security.token.impl.JWT;
@@ -43,12 +51,13 @@ import org.apache.knox.gateway.util.JsonUtils;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 import static javax.ws.rs.core.MediaType.APPLICATION_XML;
 
-@Path( TokenResource.RESOURCE_PATH )
+@Path(TokenResource.RESOURCE_PATH)
 public class TokenResource {
   private static final String EXPIRES_IN = "expires_in";
   private static final String TOKEN_TYPE = "token_type";
   private static final String ACCESS_TOKEN = "access_token";
   private static final String TARGET_URL = "target_url";
+  private static final String ENDPOINT_PUBLIC_CERT = "endpoint_public_cert";
   private static final String BEARER = "Bearer";
   private static final String TOKEN_TTL_PARAM = "knox.token.ttl";
   private static final String TOKEN_AUDIENCES_PARAM = "knox.token.audiences";
@@ -59,14 +68,16 @@ public class TokenResource {
   private static final String TOKEN_SIG_ALG = "knox.token.sigalg";
   private static final long TOKEN_TTL_DEFAULT = 30000L;
   static final String RESOURCE_PATH = "knoxtoken/api/v1/token";
-  private static TokenServiceMessages log = MessagesFactory.get( TokenServiceMessages.class );
+  private static final String TARGET_ENDPOINT_PULIC_CERT_PEM = "knox.token.target.endpoint.cert.pem";
+  private static TokenServiceMessages log = MessagesFactory.get(TokenServiceMessages.class);
   private long tokenTTL = TOKEN_TTL_DEFAULT;
   private List<String> targetAudiences = new ArrayList<>();
   private String tokenTargetUrl = null;
-  private Map<String,Object> tokenClientDataMap = null;
+  private Map<String, Object> tokenClientDataMap = null;
   private ArrayList<String> allowedDNs = new ArrayList<>();
   private boolean clientCertRequired = false;
   private String signatureAlgorithm = "RS256";
+  private String endpointPublicCert;
 
   @Context
   HttpServletRequest request;
@@ -92,7 +103,7 @@ public class TokenResource {
     if (principals != null) {
       String[] dns = principals.split(";");
       for (int i = 0; i < dns.length; i++) {
-        allowedDNs.add(dns[i].replaceAll("\\s+",""));
+        allowedDNs.add(dns[i].replaceAll("\\s+", ""));
       }
     }
 
@@ -104,8 +115,7 @@ public class TokenResource {
           log.invalidTokenTTLEncountered(ttl);
           tokenTTL = TOKEN_TTL_DEFAULT;
         }
-      }
-      catch (NumberFormatException nfe) {
+      } catch (NumberFormatException nfe) {
         log.invalidTokenTTLEncountered(ttl);
       }
     }
@@ -123,16 +133,21 @@ public class TokenResource {
     if (sigAlg != null) {
       signatureAlgorithm = sigAlg;
     }
+
+    String targetEndpointPublicCert = context.getInitParameter(TARGET_ENDPOINT_PULIC_CERT_PEM);
+    if (targetEndpointPublicCert != null) {
+      endpointPublicCert = targetEndpointPublicCert;
+    }
   }
 
   @GET
-  @Produces({APPLICATION_JSON, APPLICATION_XML})
+  @Produces({ APPLICATION_JSON, APPLICATION_XML })
   public Response doGet() {
     return getAuthenticationToken();
   }
 
   @POST
-  @Produces({APPLICATION_JSON, APPLICATION_XML})
+  @Produces({ APPLICATION_JSON, APPLICATION_XML })
   public Response doPost() {
     return getAuthenticationToken();
   }
@@ -140,7 +155,7 @@ public class TokenResource {
   private X509Certificate extractCertificate(HttpServletRequest req) {
     X509Certificate[] certs = (X509Certificate[]) req.getAttribute("javax.servlet.request.X509Certificate");
     if (null != certs && certs.length > 0) {
-        return certs[0];
+      return certs[0];
     }
     return null;
   }
@@ -149,20 +164,35 @@ public class TokenResource {
     if (clientCertRequired) {
       X509Certificate cert = extractCertificate(request);
       if (cert != null) {
-        if (!allowedDNs.contains(cert.getSubjectDN().getName().replaceAll("\\s+",""))) {
+        if (!allowedDNs.contains(cert.getSubjectDN().getName().replaceAll("\\s+", ""))) {
           return Response.status(403).entity("{ \"Unable to get token - untrusted client cert.\" }").build();
         }
-      }
-      else {
+      } else {
         return Response.status(403).entity("{ \"Unable to get token - client cert required.\" }").build();
       }
     }
     GatewayServices services = (GatewayServices) request.getServletContext()
-            .getAttribute(GatewayServices.GATEWAY_SERVICES_ATTRIBUTE);
+        .getAttribute(GatewayServices.GATEWAY_SERVICES_ATTRIBUTE);
 
     JWTokenAuthority ts = services.getService(GatewayServices.TOKEN_SERVICE);
-    Principal p = ((HttpServletRequest)request).getUserPrincipal();
+    Principal p = ((HttpServletRequest) request).getUserPrincipal();
     long expires = getExpiry();
+
+    if (endpointPublicCert == null) {
+      // acquire PEM for gateway-identity of this gateway instance
+      KeystoreService ks = services.getService(GatewayServices.KEYSTORE_SERVICE);
+      if (ks != null) {
+        try {
+          Certificate cert = ks.getKeystoreForGateway().getCertificate("gateway-identity");
+          byte[] bytes = cert.getEncoded();
+          //Base64 encoder = new Base64(76, "\n".getBytes("ASCII"));
+          endpointPublicCert = Base64.encodeBase64String(bytes);
+        } catch (KeyStoreException | KeystoreServiceException | CertificateEncodingException e) {
+          // assuming that certs will be properly provisioned across all clients
+          log.unableToAcquireCertForEndpointClients(e);
+        }
+      }
+    }
 
     try {
       JWT token = null;
@@ -185,23 +215,23 @@ public class TokenResource {
         if (tokenClientDataMap != null) {
           map.putAll(tokenClientDataMap);
         }
+        if (endpointPublicCert != null) {
+          map.put(ENDPOINT_PUBLIC_CERT, endpointPublicCert);
+        }
 
         String jsonResponse = JsonUtils.renderAsJsonString(map);
 
         return Response.ok().entity(jsonResponse).build();
-      }
-      else {
+      } else {
         return Response.serverError().build();
       }
-    }
-    catch (TokenServiceException e) {
+    } catch (TokenServiceException e) {
       log.unableToIssueToken(e);
     }
     return Response.ok().entity("{ \"Unable to acquire token.\" }").build();
   }
 
-  void addClientDataToMap(String[] tokenClientData,
-      Map<String,Object> map) {
+  void addClientDataToMap(String[] tokenClientData, Map<String, Object> map) {
     String[] kv = null;
     for (int i = 0; i < tokenClientData.length; i++) {
       kv = tokenClientData[i].split("=");
@@ -215,8 +245,7 @@ public class TokenResource {
     long expiry = 0l;
     if (tokenTTL == -1) {
       expiry = -1;
-    }
-    else {
+    } else {
       expiry = System.currentTimeMillis() + tokenTTL;
     }
     return expiry;

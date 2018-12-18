@@ -45,6 +45,8 @@ import org.apache.knox.gateway.i18n.GatewaySpiMessages;
 
 public class X509CertificateUtil {
 
+  public static final String END_CERTIFICATE = "-----END CERTIFICATE-----\n";
+  public static final String BEGIN_CERTIFICATE = "-----BEGIN CERTIFICATE-----\n";
   private static GatewaySpiMessages LOG = MessagesFactory.get(GatewaySpiMessages.class);
 
   /**
@@ -278,9 +280,9 @@ public class X509CertificateUtil {
     byte[] bytes = cert.getEncoded();
     Base64 encoder = new Base64( 76, "\n".getBytes( "ASCII" ) );
     try( final FileOutputStream out = new FileOutputStream( file ) ) {
-      out.write( "-----BEGIN CERTIFICATE-----\n".getBytes( "ASCII" ) );
+      out.write( BEGIN_CERTIFICATE.getBytes( "ASCII" ) );
       out.write( encoder.encodeToString( bytes ).getBytes( "ASCII" ) );
-      out.write( "-----END CERTIFICATE-----\n".getBytes( "ASCII" ) );
+      out.write( END_CERTIFICATE.getBytes( "ASCII" ) );
     }
   }
 
