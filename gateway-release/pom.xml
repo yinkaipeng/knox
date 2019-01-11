@@ -347,6 +347,10 @@
             <groupId>${gateway-group}</groupId>
             <artifactId>gateway-adapter</artifactId>
         </dependency>
+        <dependency>
+            <groupId>${gateway-group}</groupId>
+            <artifactId>gateway-service-hashicorp-vault</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>junit</groupId>

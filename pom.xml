@@ -102,6 +102,7 @@
         <module>gateway-shell-release</module>
         <module>gateway-test-release-utils</module>
         <module>gateway-service-nifi</module>
+        <module>gateway-service-hashicorp-vault</module>
     </modules>
 
     <properties>
@@ -130,6 +131,9 @@
         <commons-compress.version>1.18</commons-compress.version>
         <commons-lang.version>2.6</commons-lang.version>
         <cglib.version>3.2.9</cglib.version>
+        <spring-core.version>5.1.5.RELEASE</spring-core.version>
+        <spring-vault.version>2.1.2.RELEASE</spring-vault.version>
+        <testcontainers.version>1.10.6</testcontainers.version>
     </properties>
 
     <licenses>
@@ -772,6 +776,12 @@
                 <version>${gateway-version}</version>
             </dependency>
             <dependency>
+                <groupId>${gateway-group}</groupId>
+                <artifactId>gateway-service-hashicorp-vault</artifactId>
+                <version>${gateway-version}</version>
+            </dependency>
+
+            <dependency>
                 <groupId>org.glassfish.jersey.containers</groupId>
                 <artifactId>jersey-container-servlet</artifactId>
                 <version>2.6</version>
@@ -1356,6 +1366,36 @@
                 <artifactId>metrics-jetty9</artifactId>
                 <version>${metrics-version}</version>
             </dependency>
+            
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-core</artifactId>
+                <version>${spring-core.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.vault</groupId>
+                <artifactId>spring-vault-dependencies</artifactId>
+                <version>${spring-vault.version}</version>
+                <scope>import</scope>
+                <type>pom</type>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-context</artifactId>
+                <version>${spring-core.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-beans</artifactId>
+                <version>${spring-core.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-web</artifactId>
+                <version>${spring-core.version}</version>
+            </dependency>
 
             <!-- ********** ********** ********** ********** ********** ********** -->
             <!-- ********** Test Dependencies                           ********** -->
@@ -1454,6 +1494,18 @@
                 <scope>test</scope>
             </dependency>
 
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers</artifactId>
+                <version>${testcontainers.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>vault</artifactId>
+                <version>${testcontainers.version}</version>
+                <scope>test</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

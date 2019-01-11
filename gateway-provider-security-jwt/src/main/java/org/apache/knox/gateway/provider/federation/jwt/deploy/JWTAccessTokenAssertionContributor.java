@@ -27,10 +27,11 @@ import org.apache.knox.gateway.services.security.CryptoService;
 import org.apache.knox.gateway.topology.Provider;
 import org.apache.knox.gateway.topology.Service;
 
+import static org.apache.knox.gateway.services.security.AliasService.NO_CLUSTER_NAME;
+
 public class JWTAccessTokenAssertionContributor extends
     ProviderDeploymentContributorBase {
   private static final String ENCRYPT_ACCESS_TOKENS = "encrypt_access_tokens";
-  private static final String GATEWAY = "__gateway";
   private static final String FILTER_CLASSNAME = "org.apache.knox.gateway.provider.federation.jwt.filter.JWTAccessTokenAssertionFilter";
   private CryptoService crypto;
 
@@ -48,7 +49,7 @@ public class JWTAccessTokenAssertionContributor extends
   public void initializeContribution(DeploymentContext context) {
     // TODO Auto-generated method stub
     super.initializeContribution(context);
-    crypto.createAndStoreEncryptionKeyForCluster(GATEWAY, ENCRYPT_ACCESS_TOKENS);
+    crypto.createAndStoreEncryptionKeyForCluster(NO_CLUSTER_NAME, ENCRYPT_ACCESS_TOKENS);
   }
 
   @Override
