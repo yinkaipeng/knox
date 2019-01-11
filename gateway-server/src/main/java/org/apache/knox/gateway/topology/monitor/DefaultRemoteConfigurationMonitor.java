@@ -120,6 +120,7 @@ class DefaultRemoteConfigurationMonitor implements RemoteConfigurationMonitor {
                 }
             } else {
                 log.missingClientConfigurationForRemoteMonitoring();
+                throw new IllegalStateException("Missing required configuration.");
             }
         }
 
