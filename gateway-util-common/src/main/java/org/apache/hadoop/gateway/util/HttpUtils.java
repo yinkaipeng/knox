@@ -42,8 +42,8 @@ public class HttpUtils {
       if (!queryPairs.containsKey(key)) {
         queryPairs.put(key, new ArrayList<String>());
       }
-      final String value = idx > 0 && pair.length() > idx + 1 
-          ? URLDecoder.decode(pair.substring(idx + 1), "UTF-8") : "";
+      final String value = idx > 0 && pair.length() > idx
+          ? URLDecoder.decode(pair.substring(idx + 1), "UTF-8") : null;
       queryPairs.get(key).add(value);
     }
     return queryPairs;
