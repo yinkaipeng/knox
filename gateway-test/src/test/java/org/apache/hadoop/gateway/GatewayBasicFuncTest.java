@@ -283,11 +283,11 @@ public class GatewayBasicFuncTest {
         .expect()
         //.log().all()
         .statusCode( HttpStatus.SC_OK )
-        .header( "Set-Cookie", containsString( "JSESSIONID" ) )
+        .header( "Set-Cookie", containsString( GatewayServer.KNOXSESSIONCOOKIENAME ) )
         .header( "Set-Cookie", containsString( "HttpOnly" ) )
         .contentType( "application/json" )
         .content( "boolean", is( true ) )
-        .when().put( driver.getUrl( "WEBHDFS" ) + "/v1" + root + "/dir" ).getDetailedCookie( "JSESSIONID" );
+        .when().put( driver.getUrl( "WEBHDFS" ) + "/v1" + root + "/dir" ).getDetailedCookie(GatewayServer.KNOXSESSIONCOOKIENAME);
     assertThat( cookie.isSecured(), is( true ) );
     assertThat( cookie.getPath(), is( "/gateway/cluster" ) );
     assertThat( cookie.getValue().length(), greaterThan( 16 ) );
