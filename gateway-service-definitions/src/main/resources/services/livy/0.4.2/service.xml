@@ -15,7 +15,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
-<service role="LIVYSERVER" name="livy" version="0.4.1">
+<service role="LIVYSERVER" name="livy" version="0.4.2">
   <routes>
     <route path="/livy/v1/**?**"/>
     <route path="/livy/v1"/>

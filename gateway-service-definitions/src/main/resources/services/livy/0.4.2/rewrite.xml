@@ -15,11 +15,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 -->
-<service role="LIVYSERVER" name="livy" version="0.4.1">
-  <routes>
-    <route path="/livy/v1/**?**"/>
-    <route path="/livy/v1"/>
-    <route path="/livy/v1/"/>
-  </routes>
-  <dispatch classname="org.apache.knox.gateway.livy.LivyDispatch"/>
-</service>
+<rules>
+  <rule dir="IN" name="LIVYSERVER/livy/root/inbound" pattern="*://*:*/**/livy/v1">
+    <rewrite template="{$serviceUrl[LIVYSERVER]}"/>
+  </rule>
+  <rule dir="IN" name="LIVYSERVER/livy/path/inbound" pattern="*://*:*/**/livy/v1/{path=**}?{**}">
+    <rewrite template="{$serviceUrl[LIVYSERVER]}/{path=**}?{**}"/>
+  </rule>
+</rules>
