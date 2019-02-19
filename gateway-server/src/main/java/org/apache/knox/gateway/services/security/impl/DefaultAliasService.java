@@ -19,7 +19,6 @@ package org.apache.knox.gateway.services.security.impl;
 
 import java.security.KeyStore;
 import java.security.KeyStoreException;
-import java.security.SecureRandom;
 import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -35,15 +34,10 @@ import org.apache.knox.gateway.services.security.AliasServiceException;
 import org.apache.knox.gateway.services.security.KeystoreService;
 import org.apache.knox.gateway.services.security.KeystoreServiceException;
 import org.apache.knox.gateway.services.security.MasterService;
+import org.apache.knox.gateway.util.PasswordUtils;
 
 public class DefaultAliasService implements AliasService {
   private static final GatewayMessages LOG = MessagesFactory.get( GatewayMessages.class );
-
-  protected static char[] chars = { 'a', 'b', 'c', 'd', 'e', 'f', 'g',
-  'h', 'j', 'k', 'm', 'n', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w',
-  'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K',
-  'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-  '2', '3', '4', '5', '6', '7', '8', '9',};
 
   private KeystoreService keystoreService;
   private MasterService masterService;
@@ -142,15 +136,6 @@ public class DefaultAliasService implements AliasService {
     return credential;
   }
 
-  protected static String generatePassword(int length) {
-    StringBuilder sb = new StringBuilder();
-    SecureRandom r = new SecureRandom();
-    for (int i = 0; i < length; i++) {
-      sb.append(chars[r.nextInt(chars.length)]);
-    }
-    return sb.toString();
-  }
-
   public void setKeystoreService(KeystoreService ks) {
     this.keystoreService = ks;
   }
@@ -169,7 +154,7 @@ public class DefaultAliasService implements AliasService {
       LOG.failedToGenerateAliasForCluster(clusterName, e);
       throw new AliasServiceException(e);
     }
-    String passwordString = generatePassword(16);
+    String passwordString = PasswordUtils.generatePassword(16);
     addAliasForCluster(clusterName, alias, passwordString);
   }
 
