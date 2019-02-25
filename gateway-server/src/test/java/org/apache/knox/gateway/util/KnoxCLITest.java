@@ -671,7 +671,7 @@ public class KnoxCLITest {
     KnoxCLI cli = new KnoxCLI();
     int rc = cli.run(args);
     assertThat( rc, is( 0 ) );
-    MasterService ms = cli.getGatewayServices().getService("MasterService");
+    MasterService ms = cli.getGatewayServices().getService(GatewayServices.MASTER_SERVICE);
     String master = String.copyValueOf( ms.getMasterSecret() );
     assertThat( master, is( "master" ) );
     assertThat( outContent.toString(), containsString( "Master secret has been persisted to disk." ) );
@@ -751,7 +751,7 @@ public class KnoxCLITest {
     cli.setConf( config );
     rc = cli.run(args);
     assertEquals(0, rc);
-    MasterService ms = cli.getGatewayServices().getService("MasterService");
+    MasterService ms = cli.getGatewayServices().getService(GatewayServices.MASTER_SERVICE);
     // assertTrue(ms.getClass().getName(), ms.getClass().getName().equals("kjdfhgjkhfdgjkh"));
     assertTrue( new String( ms.getMasterSecret() ), "master".equals( new String( ms.getMasterSecret() ) ) );
     assertTrue(outContent.toString(), outContent.toString().contains("Master secret has been persisted to disk."));
@@ -773,7 +773,7 @@ public class KnoxCLITest {
     cli.setConf(config);
     rc = cli.run(args);
     assertThat( rc, is( 0 ) );
-    MasterService ms = cli.getGatewayServices().getService("MasterService");
+    MasterService ms = cli.getGatewayServices().getService(GatewayServices.MASTER_SERVICE);
     String master = String.copyValueOf( ms.getMasterSecret() );
     assertThat( master.length(), is( 36 ) );
     assertThat( master.indexOf( '-' ), is( 8 ) );
@@ -790,7 +790,7 @@ public class KnoxCLITest {
     outContent.reset();
     cli = new KnoxCLI();
     rc = cli.run(args);
-    ms = cli.getGatewayServices().getService("MasterService");
+    ms = cli.getGatewayServices().getService(GatewayServices.MASTER_SERVICE);
     String master2 = String.copyValueOf( ms.getMasterSecret() );
     assertThat( master2.length(), is( 36 ) );
     assertThat( UUID.fromString( master2 ), notNullValue() );
@@ -819,7 +819,7 @@ public class KnoxCLITest {
 
     rc = cli.run(args);
     assertThat( rc, is( 0 ) );
-    ms = cli.getGatewayServices().getService("MasterService");
+    ms = cli.getGatewayServices().getService(GatewayServices.MASTER_SERVICE);
     String master = String.copyValueOf( ms.getMasterSecret() );
     assertThat( master, is( "test-master-1" ) );
     assertThat( outContent.toString(), containsString( "Master secret has been persisted to disk." ) );
@@ -833,7 +833,7 @@ public class KnoxCLITest {
     args = new String[]{ "create-master", "--master", "test-master-2", "--force" };
     rc = cli.run(args);
     assertThat( rc, is( 0 ) );
-    ms = cli.getGatewayServices().getService("MasterService");
+    ms = cli.getGatewayServices().getService(GatewayServices.MASTER_SERVICE);
     master = String.copyValueOf( ms.getMasterSecret() );
     assertThat( master, is( "test-master-2" ) );
     assertThat( outContent.toString(), containsString( "Master secret has been persisted to disk." ) );

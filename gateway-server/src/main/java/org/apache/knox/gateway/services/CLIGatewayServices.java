@@ -63,7 +63,7 @@ public class CLIGatewayServices implements GatewayServices {
 
     ms = new CLIMasterService();
     ms.init(config, options);
-    services.put("MasterService", ms);
+    services.put(MASTER_SERVICE, ms);
 
     ks = new DefaultKeystoreService();
     ks.setMasterService(ms);
