@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,9 +22,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.knox.gateway.config.GatewayConfig;
 import org.apache.knox.gateway.config.impl.GatewayConfigImpl;
 
-import java.io.File;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,31 +38,31 @@ public class GatewayTestConfig extends Configuration implements GatewayConfig {
 
   /* Websocket defaults */
   public static final boolean DEFAULT_WEBSOCKET_FEATURE_ENABLED = false;
-  public static final int DEFAULT_WEBSOCKET_MAX_TEXT_MESSAGE_SIZE = Integer.MAX_VALUE;;
-  public static final int DEFAULT_WEBSOCKET_MAX_BINARY_MESSAGE_SIZE = Integer.MAX_VALUE;;
+  public static final int DEFAULT_WEBSOCKET_MAX_TEXT_MESSAGE_SIZE = Integer.MAX_VALUE;
+  public static final int DEFAULT_WEBSOCKET_MAX_BINARY_MESSAGE_SIZE = Integer.MAX_VALUE;
   public static final int DEFAULT_WEBSOCKET_MAX_TEXT_MESSAGE_BUFFER_SIZE = 32768;
   public static final int DEFAULT_WEBSOCKET_MAX_BINARY_MESSAGE_BUFFER_SIZE = 32768;
   public static final int DEFAULT_WEBSOCKET_INPUT_BUFFER_SIZE = 4096;
   public static final int DEFAULT_WEBSOCKET_ASYNC_WRITE_TIMEOUT = 60000;
   public static final int DEFAULT_WEBSOCKET_IDLE_TIMEOUT = 300000;
 
-  private String gatewayHomeDir = "gateway-home";
+  private Path gatewayHomePath = Paths.get("gateway-home");
   private String hadoopConfDir = "hadoop";
   private String gatewayHost = "localhost";
-  private int gatewayPort = 0;
+  private int gatewayPort;
   private String gatewayPath = "gateway";
-  private boolean hadoopKerberosSecured = false;
-  private String kerberosConfig = "/etc/knox/conf/krb5.conf";
-  private boolean kerberosDebugEnabled = false;
-  private String kerberosLoginConfig = "/etc/knox/conf/krb5JAASLogin.conf";
-  private String frontendUrl = null;
+  private boolean hadoopKerberosSecured;
+  private String kerberosConfig;
+  private boolean kerberosDebugEnabled;
+  private String kerberosLoginConfig;
+  private String frontendUrl;
   private boolean xForwardedEnabled = true;
-  private String gatewayApplicationsDir = null;
+  private String gatewayApplicationsDir;
   private String gatewayServicesDir;
   private String defaultTopologyName = "default";
-  private List<String> includedSSLCiphers = null;
-  private List<String> excludedSSLCiphers = null;
-  private boolean sslEnabled = false;
+  private List<String> includedSSLCiphers;
+  private List<String> excludedSSLCiphers;
+  private boolean sslEnabled;
   private String truststoreType = "jks";
   private String keystoreType = "jks";
   private boolean isTopologyPortMappingEnabled = true;
@@ -68,69 +70,96 @@ public class GatewayTestConfig extends Configuration implements GatewayConfig {
   private int backupVersionLimit = -1;
   private long backupAgeLimit = -1;
 
+  public GatewayTestConfig() {
+
+    Iterable<Path> paths = FileSystems.getDefault().getRootDirectories();
+    Path rootPath = null;
+    for (Path path : paths) {
+      rootPath = path;
+    }
+    if (rootPath == null) {
+      rootPath = Paths.get("/");
+    }
+
+    // /etc/knox/conf
+    Path etcConfKnoxPath = rootPath.resolve("etc").resolve("knox").resolve("conf");
+
+    // /etc/knox/conf/krb5.conf
+    kerberosConfig = etcConfKnoxPath.resolve("krb5.conf").toString();
+
+    // /etc/knox/conf/krb5JAASLogin.conf
+    kerberosLoginConfig = etcConfKnoxPath.resolve("krb5JAASLogin.conf").toString();
+  }
+
+
   public void setGatewayHomeDir( String gatewayHomeDir ) {
-    this.gatewayHomeDir = gatewayHomeDir;
+    this.gatewayHomePath = Paths.get(gatewayHomeDir);
   }
 
   public String getGatewayHomeDir() {
-    return this.gatewayHomeDir;
+    return gatewayHomePath.toString();
   }
 
   @Override
   public String getGatewayConfDir() {
-    return gatewayHomeDir;
+    return getGatewayConfPath().toString();
+  }
+
+  private Path getGatewayConfPath() {
+    return gatewayHomePath.resolve("conf");
   }
 
   @Override
   public String getGatewayDataDir() {
-    return gatewayHomeDir;
+    return getGatewayDataPath().toString();
+  }
+
+  private Path getGatewayDataPath() {
+    return gatewayHomePath.resolve("data");
   }
 
   @Override
   public String getGatewaySecurityDir() {
-    return gatewayHomeDir + "/security";
+    return getGatewaySecurityPath().toString();
+  }
+
+  private Path getGatewaySecurityPath() {
+    return getGatewayDataPath().resolve("security");
+  }
+
+  @Override
+  public String getGatewayKeystoreDir() {
+    return getGatewayKeystorePath().toString();
+  }
+
+  private Path getGatewayKeystorePath() {
+    return getGatewayDataPath().resolve("keystores");
   }
 
   @Override
   public String getGatewayTopologyDir() {
-    return gatewayHomeDir + "/topologies";
+    return gatewayHomePath.resolve("topologies").toString();
   }
 
   @Override
   public String getGatewayDeploymentDir() {
-    return gatewayHomeDir + "/deployments";
+    return gatewayHomePath.resolve("deployments").toString();
   }
-
-//  public void setDeploymentDir( String clusterConfDir ) {
-//    this.deployDir = clusterConfDir;
-//  }
 
   @Override
   public String getHadoopConfDir() {
     return hadoopConfDir;
   }
 
-//  public void setHadoopConfDir( String hadoopConfDir ) {
-//    this.hadoopConfDir = hadoopConfDir;
-//  }
-
   @Override
   public String getGatewayHost() {
     return gatewayHost;
   }
 
-//  public void setGatewayHost( String gatewayHost ) {
-//    this.gatewayHost = gatewayHost;
-//  }
-
   @Override
   public int getGatewayPort() {
     return gatewayPort;
   }
-
-//  public void setGatewayPort( int gatewayPort ) {
-//    this.gatewayPort = gatewayPort;
-//  }
 
   @Override
   public String getGatewayPath() {
@@ -148,7 +177,32 @@ public class GatewayTestConfig extends Configuration implements GatewayConfig {
 
 
   public long getGatewayIdleTimeout() {
-    return 0l;
+    return 0L;
+  }
+
+  @Override
+  public String getIdentityKeystorePath() {
+    return getGatewayKeystorePath().resolve(DEFAULT_GATEWAY_KEYSTORE_NAME).toString();
+  }
+
+  @Override
+  public String getIdentityKeystoreType() {
+    return DEFAULT_IDENTITY_KEYSTORE_TYPE;
+  }
+
+  @Override
+  public String getIdentityKeystorePasswordAlias() {
+    return DEFAULT_IDENTITY_KEYSTORE_PASSWORD_ALIAS;
+  }
+
+  @Override
+  public String getIdentityKeyAlias() {
+    return DEFAULT_IDENTITY_KEY_ALIAS;
+  }
+
+  @Override
+  public String getIdentityKeyPassphraseAlias() {
+    return DEFAULT_IDENTITY_KEY_PASSPHRASE_ALIAS;
   }
 
   @Override
@@ -313,8 +367,7 @@ public class GatewayTestConfig extends Configuration implements GatewayConfig {
     if( gatewayServicesDir != null ) {
       return gatewayServicesDir;
     } else {
-      File targetDir = new File( System.getProperty( "user.dir" ), "target/services" );
-      return targetDir.getPath();
+      return Paths.get(System.getProperty("user.dir"), "target", "services").toString();
     }
   }
 
@@ -327,7 +380,7 @@ public class GatewayTestConfig extends Configuration implements GatewayConfig {
     if( gatewayApplicationsDir != null ) {
       return gatewayApplicationsDir;
     } else {
-      return getGatewayConfDir() + "/applications";
+      return getGatewayConfPath().resolve("applications").toString();
     }
   }
 
@@ -426,12 +479,29 @@ public class GatewayTestConfig extends Configuration implements GatewayConfig {
     return null;
   }
 
-  /* (non-Javadoc)
-   * @see GatewayConfig#getSigningKeyAlias()
-   */
+  @Override
+  public String getSigningKeystorePath() {
+    return getGatewayKeystorePath().resolve(DEFAULT_GATEWAY_KEYSTORE_NAME).toString();
+  }
+
+  @Override
+  public String getSigningKeystoreType() {
+    return DEFAULT_SIGNING_KEYSTORE_TYPE;
+  }
+
   @Override
   public String getSigningKeyAlias() {
-    return null;
+    return DEFAULT_SIGNING_KEY_ALIAS;
+  }
+
+  @Override
+  public String getSigningKeystorePasswordAlias() {
+    return DEFAULT_SIGNING_KEYSTORE_PASSWORD_ALIAS;
+  }
+
+  @Override
+  public String getSigningKeyPassphraseAlias() {
+    return DEFAULT_SIGNING_KEY_PASSPHRASE_ALIAS;
   }
 
   @Override

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,6 +19,8 @@ package org.apache.knox.gateway.services.token.impl;
 
 import java.io.File;
 import java.security.Principal;
+import java.security.interfaces.RSAPublicKey;
+import java.util.Collections;
 import java.util.HashMap;
 
 import org.apache.knox.gateway.config.GatewayConfig;
@@ -50,15 +52,20 @@ public class DefaultTokenAuthorityServiceTest extends org.junit.Assert {
       basedir = new File(".").getCanonicalPath();
     }
 
-    EasyMock.expect(config.getGatewaySecurityDir()).andReturn(basedir + "/target/test-classes");
-    EasyMock.expect(config.getSigningKeystoreName()).andReturn("server-keystore.jks");
+    EasyMock.expect(config.getGatewaySecurityDir()).andReturn(basedir + "/target/test-classes").anyTimes();
+    EasyMock.expect(config.getGatewayKeystoreDir()).andReturn(basedir + "/target/test-classes/keystores").anyTimes();
+    EasyMock.expect(config.getSigningKeystoreName()).andReturn("server-keystore.jks").anyTimes();
+    EasyMock.expect(config.getSigningKeystorePath()).andReturn(basedir + "/target/test-classes/keystores/server-keystore.jks").anyTimes();
+    EasyMock.expect(config.getSigningKeystorePasswordAlias()).andReturn(GatewayConfig.DEFAULT_SIGNING_KEYSTORE_PASSWORD_ALIAS).anyTimes();
+    EasyMock.expect(config.getSigningKeyPassphraseAlias()).andReturn(GatewayConfig.DEFAULT_SIGNING_KEY_PASSPHRASE_ALIAS).anyTimes();
+    EasyMock.expect(config.getSigningKeystoreType()).andReturn("jks").anyTimes();
     EasyMock.expect(config.getSigningKeyAlias()).andReturn("server").anyTimes();
 
     MasterService ms = EasyMock.createNiceMock(MasterService.class);
     EasyMock.expect(ms.getMasterSecret()).andReturn("horton".toCharArray());
 
     AliasService as = EasyMock.createNiceMock(AliasService.class);
-    EasyMock.expect(as.getGatewayIdentityPassphrase()).andReturn("horton".toCharArray());
+    EasyMock.expect(as.getSigningKeyPassphrase()).andReturn("horton".toCharArray()).anyTimes();
 
     EasyMock.replay(principal, config, ms, as);
 
@@ -92,15 +99,20 @@ public class DefaultTokenAuthorityServiceTest extends org.junit.Assert {
       basedir = new File(".").getCanonicalPath();
     }
 
-    EasyMock.expect(config.getGatewaySecurityDir()).andReturn(basedir + "/target/test-classes");
-    EasyMock.expect(config.getSigningKeystoreName()).andReturn("server-keystore.jks");
+    EasyMock.expect(config.getGatewaySecurityDir()).andReturn(basedir + "/target/test-classes").anyTimes();
+    EasyMock.expect(config.getGatewayKeystoreDir()).andReturn(basedir + "/target/test-classes/keystores").anyTimes();
+    EasyMock.expect(config.getSigningKeystoreName()).andReturn("server-keystore.jks").anyTimes();
+    EasyMock.expect(config.getSigningKeystorePath()).andReturn(basedir + "/target/test-classes/keystores/server-keystore.jks").anyTimes();
+    EasyMock.expect(config.getSigningKeystorePasswordAlias()).andReturn(GatewayConfig.DEFAULT_SIGNING_KEYSTORE_PASSWORD_ALIAS).anyTimes();
+    EasyMock.expect(config.getSigningKeyPassphraseAlias()).andReturn(GatewayConfig.DEFAULT_SIGNING_KEY_PASSPHRASE_ALIAS).anyTimes();
+    EasyMock.expect(config.getSigningKeystoreType()).andReturn("jks").anyTimes();
     EasyMock.expect(config.getSigningKeyAlias()).andReturn("server").anyTimes();
 
     MasterService ms = EasyMock.createNiceMock(MasterService.class);
     EasyMock.expect(ms.getMasterSecret()).andReturn("horton".toCharArray());
 
     AliasService as = EasyMock.createNiceMock(AliasService.class);
-    EasyMock.expect(as.getGatewayIdentityPassphrase()).andReturn("horton".toCharArray());
+    EasyMock.expect(as.getSigningKeyPassphrase()).andReturn("horton".toCharArray()).anyTimes();
 
     EasyMock.replay(principal, config, ms, as);
 
@@ -135,15 +147,20 @@ public class DefaultTokenAuthorityServiceTest extends org.junit.Assert {
       basedir = new File(".").getCanonicalPath();
     }
 
-    EasyMock.expect(config.getGatewaySecurityDir()).andReturn(basedir + "/target/test-classes");
-    EasyMock.expect(config.getSigningKeystoreName()).andReturn("server-keystore.jks");
+    EasyMock.expect(config.getGatewaySecurityDir()).andReturn(basedir + "/target/test-classes").anyTimes();
+    EasyMock.expect(config.getGatewayKeystoreDir()).andReturn(basedir + "/target/test-classes/keystores").anyTimes();
+    EasyMock.expect(config.getSigningKeystoreName()).andReturn("server-keystore.jks").anyTimes();
+    EasyMock.expect(config.getSigningKeystorePath()).andReturn(basedir + "/target/test-classes/keystores/server-keystore.jks").anyTimes();
+    EasyMock.expect(config.getSigningKeystorePasswordAlias()).andReturn(GatewayConfig.DEFAULT_SIGNING_KEYSTORE_PASSWORD_ALIAS).anyTimes();
+    EasyMock.expect(config.getSigningKeyPassphraseAlias()).andReturn(GatewayConfig.DEFAULT_SIGNING_KEY_PASSPHRASE_ALIAS).anyTimes();
+    EasyMock.expect(config.getSigningKeystoreType()).andReturn("jks").anyTimes();
     EasyMock.expect(config.getSigningKeyAlias()).andReturn("server").anyTimes();
 
     MasterService ms = EasyMock.createNiceMock(MasterService.class);
     EasyMock.expect(ms.getMasterSecret()).andReturn("horton".toCharArray());
 
     AliasService as = EasyMock.createNiceMock(AliasService.class);
-    EasyMock.expect(as.getGatewayIdentityPassphrase()).andReturn("horton".toCharArray());
+    EasyMock.expect(as.getSigningKeyPassphrase()).andReturn("horton".toCharArray()).anyTimes();
 
     EasyMock.replay(principal, config, ms, as);
 
@@ -177,15 +194,20 @@ public class DefaultTokenAuthorityServiceTest extends org.junit.Assert {
       basedir = new File(".").getCanonicalPath();
     }
 
-    EasyMock.expect(config.getGatewaySecurityDir()).andReturn(basedir + "/target/test-classes");
-    EasyMock.expect(config.getSigningKeystoreName()).andReturn("server-keystore.jks");
+    EasyMock.expect(config.getGatewaySecurityDir()).andReturn(basedir + "/target/test-classes").anyTimes();
+    EasyMock.expect(config.getGatewayKeystoreDir()).andReturn(basedir + "/target/test-classes/keystores").anyTimes();
+    EasyMock.expect(config.getSigningKeystoreName()).andReturn("server-keystore.jks").anyTimes();
+    EasyMock.expect(config.getSigningKeystorePath()).andReturn(basedir + "/target/test-classes/keystores/server-keystore.jks").anyTimes();
+    EasyMock.expect(config.getSigningKeystorePasswordAlias()).andReturn(GatewayConfig.DEFAULT_SIGNING_KEYSTORE_PASSWORD_ALIAS).anyTimes();
+    EasyMock.expect(config.getSigningKeyPassphraseAlias()).andReturn(GatewayConfig.DEFAULT_SIGNING_KEY_PASSPHRASE_ALIAS).anyTimes();
+    EasyMock.expect(config.getSigningKeystoreType()).andReturn("jks").anyTimes();
     EasyMock.expect(config.getSigningKeyAlias()).andReturn("server").anyTimes();
 
     MasterService ms = EasyMock.createNiceMock(MasterService.class);
     EasyMock.expect(ms.getMasterSecret()).andReturn("horton".toCharArray());
 
     AliasService as = EasyMock.createNiceMock(AliasService.class);
-    EasyMock.expect(as.getGatewayIdentityPassphrase()).andReturn("horton".toCharArray());
+    EasyMock.expect(as.getSigningKeyPassphrase()).andReturn("horton".toCharArray()).anyTimes();
 
     EasyMock.replay(principal, config, ms, as);
 
@@ -220,15 +242,20 @@ public class DefaultTokenAuthorityServiceTest extends org.junit.Assert {
       basedir = new File(".").getCanonicalPath();
     }
 
-    EasyMock.expect(config.getGatewaySecurityDir()).andReturn(basedir + "/target/test-classes");
-    EasyMock.expect(config.getSigningKeystoreName()).andReturn("server-keystore.jks");
+    EasyMock.expect(config.getGatewaySecurityDir()).andReturn(basedir + "/target/test-classes").anyTimes();
+    EasyMock.expect(config.getGatewayKeystoreDir()).andReturn(basedir + "/target/test-classes/keystores").anyTimes();
+    EasyMock.expect(config.getSigningKeystoreName()).andReturn("server-keystore.jks").anyTimes();
+    EasyMock.expect(config.getSigningKeystorePath()).andReturn(basedir + "/target/test-classes/keystores/server-keystore.jks").anyTimes();
+    EasyMock.expect(config.getSigningKeystorePasswordAlias()).andReturn(GatewayConfig.DEFAULT_SIGNING_KEYSTORE_PASSWORD_ALIAS).anyTimes();
+    EasyMock.expect(config.getSigningKeyPassphraseAlias()).andReturn(GatewayConfig.DEFAULT_SIGNING_KEY_PASSPHRASE_ALIAS).anyTimes();
+    EasyMock.expect(config.getSigningKeystoreType()).andReturn("jks").anyTimes();
     EasyMock.expect(config.getSigningKeyAlias()).andReturn("server").anyTimes();
 
     MasterService ms = EasyMock.createNiceMock(MasterService.class);
     EasyMock.expect(ms.getMasterSecret()).andReturn("horton".toCharArray());
 
     AliasService as = EasyMock.createNiceMock(AliasService.class);
-    EasyMock.expect(as.getGatewayIdentityPassphrase()).andReturn("horton".toCharArray());
+    EasyMock.expect(as.getSigningKeyPassphrase()).andReturn("horton".toCharArray()).anyTimes();
 
     EasyMock.replay(principal, config, ms, as);
 
@@ -247,8 +274,67 @@ public class DefaultTokenAuthorityServiceTest extends org.junit.Assert {
       ta.issueToken(principal, "none");
       fail("Failure expected on a bad signature algorithm");
     } catch (TokenServiceException ex) {
-        // expected
+      // expected
     }
   }
 
+  @Test
+  public void testTokenCreationCustomSigningKey() throws Exception {
+    /*
+     Generated testSigningKeyName.jks with the following commands:
+     cd gateway-server/src/test/resources/keystores/
+     keytool -genkey -alias testSigningKeyAlias -keyalg RSA -keystore testSigningKeyName.jks \
+         -storepass testSigningKeyPassphrase -keypass testSigningKeyPassphrase -keysize 2048 \
+         -dname 'CN=testSigningKey,OU=example,O=Apache,L=US,ST=CA,C=US' -noprompt
+     */
+
+    String customSigningKeyName = "testSigningKeyName";
+    String customSigningKeyAlias = "testSigningKeyAlias";
+    String customSigningKeyPassphrase = "testSigningKeyPassphrase";
+
+    Principal principal = EasyMock.createNiceMock(Principal.class);
+    EasyMock.expect(principal.getName()).andReturn("john.doe@example.com");
+
+    GatewayConfig config = EasyMock.createNiceMock(GatewayConfig.class);
+    String basedir = System.getProperty("basedir");
+    if (basedir == null) {
+      basedir = new File(".").getCanonicalPath();
+    }
+
+    EasyMock.expect(config.getGatewaySecurityDir()).andReturn(basedir + "/target/test-classes").anyTimes();
+    EasyMock.expect(config.getGatewayKeystoreDir()).andReturn(basedir + "/target/test-classes/keystores").anyTimes();
+    EasyMock.expect(config.getSigningKeystoreName()).andReturn("server-keystore.jks").anyTimes();
+    EasyMock.expect(config.getSigningKeystorePath()).andReturn(basedir + "/target/test-classes/keystores/server-keystore.jks").anyTimes();
+    EasyMock.expect(config.getSigningKeystorePasswordAlias()).andReturn(GatewayConfig.DEFAULT_SIGNING_KEYSTORE_PASSWORD_ALIAS).anyTimes();
+    EasyMock.expect(config.getSigningKeyPassphraseAlias()).andReturn(GatewayConfig.DEFAULT_SIGNING_KEY_PASSPHRASE_ALIAS).anyTimes();
+    EasyMock.expect(config.getSigningKeystoreType()).andReturn("jks").anyTimes();
+    EasyMock.expect(config.getSigningKeyAlias()).andReturn("server").anyTimes();
+
+    MasterService ms = EasyMock.createNiceMock(MasterService.class);
+    EasyMock.expect(ms.getMasterSecret()).andReturn("horton".toCharArray());
+
+    AliasService as = EasyMock.createNiceMock(AliasService.class);
+    EasyMock.expect(as.getSigningKeyPassphrase()).andReturn("horton".toCharArray()).anyTimes();
+
+    EasyMock.replay(principal, config, ms, as);
+
+    DefaultKeystoreService ks = new DefaultKeystoreService();
+    ks.setMasterService(ms);
+    ks.init(config, new HashMap<>());
+
+    DefaultTokenAuthorityService ta = new DefaultTokenAuthorityService();
+    ta.setAliasService(as);
+    ta.setKeystoreService(ks);
+    ta.init(config, new HashMap<>());
+
+    JWT token = ta.issueToken(principal, Collections.emptyList(), "RS256", -1,
+        customSigningKeyName, customSigningKeyAlias, customSigningKeyPassphrase.toCharArray());
+    assertEquals("KNOXSSO", token.getIssuer());
+    assertEquals("john.doe@example.com", token.getSubject());
+
+    RSAPublicKey customPublicKey = (RSAPublicKey)ks.getSigningKeystore(customSigningKeyName)
+                                                     .getCertificate(customSigningKeyAlias).getPublicKey();
+    assertFalse(ta.verifyToken(token));
+    assertTrue(ta.verifyToken(token, customPublicKey));
+  }
 }

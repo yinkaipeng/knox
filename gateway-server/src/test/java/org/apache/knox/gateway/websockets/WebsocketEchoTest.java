@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,6 +17,12 @@
  */
 package org.apache.knox.gateway.websockets;
 
+import static org.apache.knox.gateway.config.GatewayConfig.DEFAULT_IDENTITY_KEYSTORE_PASSWORD_ALIAS;
+import static org.apache.knox.gateway.config.GatewayConfig.DEFAULT_IDENTITY_KEYSTORE_TYPE;
+import static org.apache.knox.gateway.config.GatewayConfig.DEFAULT_IDENTITY_KEY_PASSPHRASE_ALIAS;
+import static org.apache.knox.gateway.config.GatewayConfig.DEFAULT_SIGNING_KEYSTORE_PASSWORD_ALIAS;
+import static org.apache.knox.gateway.config.GatewayConfig.DEFAULT_SIGNING_KEYSTORE_TYPE;
+import static org.apache.knox.gateway.config.GatewayConfig.DEFAULT_SIGNING_KEY_PASSPHRASE_ALIAS;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
@@ -25,6 +31,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -73,14 +81,15 @@ import com.mycila.xmltool.XMLTag;
  * address of the Websocket server.
  * <li>A mock client is setup to connect to gateway.
  * </ul>
- * 
+ *
  * The test is to confirm whether the message is sent all the way to the backend
  * Websocket server through Knox and back.
- * 
- * 
+ *
+ *
  * @since 0.10
  */
 public class WebsocketEchoTest {
+  private static final String TEST_KEY_ALIAS = "test-identity";
 
   /**
    * Simulate backend websocket
@@ -109,13 +118,22 @@ public class WebsocketEchoTest {
   private static URI serverUri;
 
   private static File topoDir;
+  private static Path dataDir;
+  private static Path securityDir;
+  private static Path keystoresDir;
+  private static Path keystoreFile;
 
   public WebsocketEchoTest() {
     super();
   }
 
   @BeforeClass
-  public static void startServers() throws Exception {
+  public static void setUpBeforeClass() throws Exception {
+    topoDir = createDir();
+    dataDir = Paths.get(topoDir.getAbsolutePath(), "data").toAbsolutePath();
+    securityDir = dataDir.resolve("security");
+    keystoresDir = securityDir.resolve("keystores");
+    keystoreFile = keystoresDir.resolve("tls.jks");
 
     startWebsocketServer();
     startGatewayServer();
@@ -123,7 +141,7 @@ public class WebsocketEchoTest {
   }
 
   @AfterClass
-  public static void stopServers() {
+  public static void tearDownAfterClass() {
     try {
       gatewayServer.stop();
       backendServer.stop();
@@ -138,7 +156,7 @@ public class WebsocketEchoTest {
 
   /**
    * Test direct connection to websocket server without gateway
-   * 
+   *
    * @throws Exception
    */
   @Test
@@ -156,7 +174,7 @@ public class WebsocketEchoTest {
 
   /**
    * Test websocket proxying through gateway.
-   * 
+   *
    * @throws Exception
    */
   @Test
@@ -196,7 +214,7 @@ public class WebsocketEchoTest {
 
   /**
    * Start Mock Websocket server that acts as backend.
-   * 
+   *
    * @throws Exception
    */
   private static void startWebsocketServer() throws Exception {
@@ -226,7 +244,7 @@ public class WebsocketEchoTest {
 
   /**
    * Start Gateway Server.
-   * 
+   *
    * @throws Exception
    */
   private static void startGatewayServer() throws Exception {
@@ -265,7 +283,7 @@ public class WebsocketEchoTest {
 
   /**
    * Initialize the configs and components required for this test.
-   * 
+   *
    * @param backend
    * @throws IOException
    */
@@ -273,7 +291,6 @@ public class WebsocketEchoTest {
       throws IOException {
     services = new DefaultGatewayServices();
 
-    topoDir = createDir();
     URL serviceUrl = ClassLoader.getSystemResource("websocket-services");
 
     final File descriptor = new File(topoDir, "websocket.xml");
@@ -302,9 +319,6 @@ public class WebsocketEchoTest {
 
     EasyMock.expect(gatewayConfig.getEphemeralDHKeySize()).andReturn("2048")
         .anyTimes();
-
-    EasyMock.expect(gatewayConfig.getGatewaySecurityDir())
-        .andReturn(topoDir.toString()).anyTimes();
 
     /* Websocket configs */
     EasyMock.expect(gatewayConfig.isWebsocketEnabled()).andReturn(true)
@@ -342,6 +356,59 @@ public class WebsocketEchoTest {
     EasyMock.expect(gatewayConfig.getRemoteRegistryConfigurationNames())
             .andReturn(Collections.emptyList())
             .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getGatewayDataDir())
+        .andReturn(dataDir.toString())
+        .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getGatewaySecurityDir())
+        .andReturn(securityDir.toString())
+        .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getGatewayKeystoreDir())
+        .andReturn(keystoresDir.toString())
+        .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getIdentityKeystorePath())
+        .andReturn(keystoreFile.toString())
+        .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getIdentityKeystoreType())
+        .andReturn(DEFAULT_IDENTITY_KEYSTORE_TYPE)
+        .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getIdentityKeystorePasswordAlias())
+        .andReturn(DEFAULT_IDENTITY_KEYSTORE_PASSWORD_ALIAS)
+        .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getIdentityKeyAlias())
+        .andReturn(TEST_KEY_ALIAS)
+        .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getIdentityKeyPassphraseAlias())
+        .andReturn(DEFAULT_IDENTITY_KEY_PASSPHRASE_ALIAS)
+        .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getSigningKeystorePasswordAlias())
+        .andReturn(DEFAULT_SIGNING_KEYSTORE_PASSWORD_ALIAS)
+        .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getSigningKeyPassphraseAlias())
+        .andReturn(DEFAULT_SIGNING_KEY_PASSPHRASE_ALIAS)
+        .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getSigningKeystorePath())
+        .andReturn(keystoreFile.toString())
+        .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getSigningKeystoreType())
+        .andReturn(DEFAULT_SIGNING_KEYSTORE_TYPE)
+        .anyTimes();
+
+    EasyMock.expect(gatewayConfig.getSigningKeyAlias())
+        .andReturn(TEST_KEY_ALIAS)
+        .anyTimes();
+
 
     EasyMock.replay(gatewayConfig);
 

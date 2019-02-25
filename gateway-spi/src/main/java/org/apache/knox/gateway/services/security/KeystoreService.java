@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,36 +19,46 @@ package org.apache.knox.gateway.services.security;
 
 import java.security.Key;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.cert.Certificate;
 
 public interface KeystoreService {
 
-  public void createKeystoreForGateway() throws KeystoreServiceException;
+  void createKeystoreForGateway() throws KeystoreServiceException;
 
-  public void addSelfSignedCertForGateway(String alias, char[] passphrase) throws KeystoreServiceException;
-  
+  void addSelfSignedCertForGateway(String alias, char[] passphrase) throws KeystoreServiceException;
+
   void addSelfSignedCertForGateway(String alias, char[] passphrase, String hostname) throws KeystoreServiceException;
 
-  public KeyStore getKeystoreForGateway() throws KeystoreServiceException;
+  KeyStore getKeystoreForGateway() throws KeystoreServiceException;
 
-  public KeyStore getSigningKeystore() throws KeystoreServiceException;
+  KeyStore getSigningKeystore() throws KeystoreServiceException;
 
-  public Key getKeyForGateway(String alias, char[] passphrase) throws KeystoreServiceException;
+  KeyStore getSigningKeystore(String keystoreName) throws KeystoreServiceException;
 
-  public Key getSigningKey(String alias, char[] passphrase) throws KeystoreServiceException;
+  Key getKeyForGateway(String alias, char[] passphrase) throws KeystoreServiceException;
 
-  public void createCredentialStoreForCluster(String clusterName) throws KeystoreServiceException;
-  
-  public boolean isCredentialStoreForClusterAvailable(String clusterName) throws KeystoreServiceException;
+  Key getKeyForGateway(char[] passphrase) throws KeystoreServiceException;
 
-  public boolean isKeystoreForGatewayAvailable() throws KeystoreServiceException;
-  
-  public KeyStore getCredentialStoreForCluster(String clusterName) throws KeystoreServiceException;
+  Certificate getCertificateForGateway() throws KeystoreServiceException, KeyStoreException;
 
-  public void addCredentialForCluster(String clusterName, String alias, String key) throws KeystoreServiceException;
+  Key getSigningKey(String alias, char[] passphrase) throws KeystoreServiceException;
 
-  public void removeCredentialForCluster(String clusterName, String alias) throws KeystoreServiceException;
+  Key getSigningKey(String keystoreName, String alias, char[] passphrase) throws KeystoreServiceException;
 
-  public char[] getCredentialForCluster(String clusterName, String alias) throws KeystoreServiceException;
+  void createCredentialStoreForCluster(String clusterName) throws KeystoreServiceException;
 
-  public String getKeystorePath();
+  boolean isCredentialStoreForClusterAvailable(String clusterName) throws KeystoreServiceException;
+
+  boolean isKeystoreForGatewayAvailable() throws KeystoreServiceException;
+
+  KeyStore getCredentialStoreForCluster(String clusterName) throws KeystoreServiceException;
+
+  void addCredentialForCluster(String clusterName, String alias, String key) throws KeystoreServiceException;
+
+  void removeCredentialForCluster(String clusterName, String alias) throws KeystoreServiceException;
+
+  char[] getCredentialForCluster(String clusterName, String alias) throws KeystoreServiceException;
+
+  String getKeystorePath();
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,6 +18,7 @@
 package org.apache.knox.gateway.services.security.impl;
 
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -143,24 +144,14 @@ public class DefaultCryptoService implements CryptoService {
   }
 
   @Override
-  public boolean verify(String algorithm, String alias, String signed, byte[] signature) {
+  public boolean verify(String algorithm, String signed, byte[] signature) {
     boolean verified = false;
     try {
       Signature sig=Signature.getInstance(algorithm);
-      sig.initVerify(ks.getKeystoreForGateway().getCertificate(alias).getPublicKey());
-      sig.update(signed.getBytes("UTF-8"));
+      sig.initVerify(ks.getCertificateForGateway().getPublicKey());
+      sig.update(signed.getBytes(StandardCharsets.UTF_8));
       verified = sig.verify(signature);
-    } catch (SignatureException e) {
-      LOG.failedToVerifySignature( e );
-    } catch (NoSuchAlgorithmException e) {
-      LOG.failedToVerifySignature( e );
-    } catch (InvalidKeyException e) {
-      LOG.failedToVerifySignature( e );
-    } catch (KeyStoreException e) {
-      LOG.failedToVerifySignature( e );
-    } catch (UnsupportedEncodingException e) {
-      LOG.failedToVerifySignature( e );
-    } catch (KeystoreServiceException e) {
+    } catch (SignatureException | KeystoreServiceException | InvalidKeyException | NoSuchAlgorithmException | KeyStoreException e) {
       LOG.failedToVerifySignature( e );
     }
     LOG.signatureVerified( verified );
@@ -168,26 +159,16 @@ public class DefaultCryptoService implements CryptoService {
   }
 
   @Override
-  public byte[] sign(String algorithm, String alias, String payloadToSign) {
+  public byte[] sign(String algorithm, String payloadToSign) {
     try {
       char[] passphrase = null;
       passphrase = as.getGatewayIdentityPassphrase();
-      PrivateKey privateKey = (PrivateKey) ks.getKeyForGateway(alias, passphrase);
+      PrivateKey privateKey = (PrivateKey) ks.getKeyForGateway(passphrase);
       Signature signature = Signature.getInstance(algorithm);
       signature.initSign(privateKey);
-      signature.update(payloadToSign.getBytes("UTF-8"));
+      signature.update(payloadToSign.getBytes(StandardCharsets.UTF_8));
       return signature.sign();
-    } catch (NoSuchAlgorithmException e) {
-      LOG.failedToSignData( e );
-    } catch (InvalidKeyException e) {
-      LOG.failedToSignData( e );
-    } catch (SignatureException e) {
-      LOG.failedToSignData( e );
-    } catch (UnsupportedEncodingException e) {
-      LOG.failedToSignData( e );
-    } catch (KeystoreServiceException e) {
-      LOG.failedToSignData( e );
-    } catch (AliasServiceException e) {
+    } catch (NoSuchAlgorithmException | AliasServiceException | KeystoreServiceException | SignatureException | InvalidKeyException e) {
       LOG.failedToSignData( e );
     }
     return null;

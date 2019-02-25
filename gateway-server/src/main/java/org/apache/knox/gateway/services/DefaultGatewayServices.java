@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -101,20 +101,22 @@ public class DefaultGatewayServices implements GatewayServices {
     crypto.setAliasService(alias);
     crypto.init(config, options);
     services.put(CRYPTO_SERVICE, crypto);
-    
-    DefaultTokenAuthorityService ts = new DefaultTokenAuthorityService();
-    ts.setAliasService(alias);
-    ts.setKeystoreService(ks);
-    ts.init(config, options);
-    // prolly should not allow the token service to be looked up?
-    services.put(TOKEN_SERVICE, ts);
-    
+
     JettySSLService ssl = new JettySSLService();
     ssl.setAliasService(alias);
     ssl.setKeystoreService(ks);
     ssl.setMasterService(ms);
     ssl.init(config, options);
     services.put(SSL_SERVICE, ssl);
+
+    // The DefaultTokenAuthorityService needs to be initialized after the JettySSLService to ensure
+    // that the signing keystore is available for it.
+    DefaultTokenAuthorityService ts = new DefaultTokenAuthorityService();
+    ts.setAliasService(alias);
+    ts.setKeystoreService(ks);
+    ts.init(config, options);
+    // prolly should not allow the token service to be looked up?
+    services.put(TOKEN_SERVICE, ts);
 
     DefaultServiceRegistryService sr = new DefaultServiceRegistryService();
     sr.setCryptoService( crypto );
@@ -199,7 +201,7 @@ public class DefaultGatewayServices implements GatewayServices {
     metricsService.stop();
 
   }
-  
+
   /* (non-Javadoc)
    * @see org.apache.knox.gateway.GatewayServices#getServiceNames()
    */
@@ -207,7 +209,7 @@ public class DefaultGatewayServices implements GatewayServices {
   public Collection<String> getServiceNames() {
     return services.keySet();
   }
-  
+
   /* (non-Javadoc)
    * @see org.apache.knox.gateway.GatewayServices#getService(java.lang.String)
    */
