@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
+import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.Key;
 import java.security.KeyPair;
@@ -65,8 +66,6 @@ public class DefaultKeystoreService extends BaseKeystoreService implements
   private static GatewayResources RES = ResourcesFactory.get( GatewayResources.class );
 
   private GatewayConfig config;
-  private String signingKeystoreName = null;
-  private String signingKeyAlias = null;
   private Map<String, Map<String, String>> cache = new ConcurrentHashMap<String,Map<String, String>>();
   private Lock readLock = null;
   private Lock writeLock = null;
@@ -80,37 +79,11 @@ public class DefaultKeystoreService extends BaseKeystoreService implements
 
     this.config = config;
 
-    this.keyStoreDir = config.getGatewaySecurityDir() + File.separator + "keystores" + File.separator;
+    this.keyStoreDir = config.getGatewayKeystoreDir();
     File ksd = new File(this.keyStoreDir);
     if (!ksd.exists()) {
       if( !ksd.mkdirs() ) {
         throw new ServiceLifecycleException( RES.failedToCreateKeyStoreDirectory( ksd.getAbsolutePath() ) );
-      }
-    }
-
-    signingKeystoreName = config.getSigningKeystoreName();
-    // ensure that the keystore actually exists and fail to start if not
-    if (signingKeystoreName != null) {
-      File sks = new File(this.keyStoreDir, signingKeystoreName);
-      if (!sks.exists()) {
-        throw new ServiceLifecycleException("Configured signing keystore does not exist.");
-      }
-      signingKeyAlias = config.getSigningKeyAlias();
-      if (signingKeyAlias != null) {
-        // ensure that the signing key alias exists in the configured keystore
-        KeyStore ks;
-        try {
-          ks = getSigningKeystore();
-          if (ks != null) {
-            if (!ks.containsAlias(signingKeyAlias)) {
-                throw new ServiceLifecycleException("Configured signing key alias does not exist.");
-            }
-          }
-        } catch (KeystoreServiceException e) {
-          throw new ServiceLifecycleException("Unable to get the configured signing keystore.", e);
-        } catch (KeyStoreException e) {
-          throw new ServiceLifecycleException("Signing keystore has not been loaded.", e);
-        }
       }
     }
   }
@@ -240,7 +213,7 @@ public class DefaultKeystoreService extends BaseKeystoreService implements
 
   @Override
   public void createCredentialStoreForCluster(String clusterName) throws KeystoreServiceException {
-    String filename = keyStoreDir + clusterName + CREDENTIALS_SUFFIX;
+    String filename = Paths.get(keyStoreDir, clusterName + CREDENTIALS_SUFFIX).toString();
     writeLock.lock();
     try {
       createKeystore(filename, "JCEKS", masterService.getMasterSecret());
@@ -253,7 +226,7 @@ public class DefaultKeystoreService extends BaseKeystoreService implements
   @Override
   public boolean isCredentialStoreForClusterAvailable(String clusterName) throws KeystoreServiceException {
     boolean rc = false;
-    final File  keyStoreFile = new File( keyStoreDir + clusterName + CREDENTIALS_SUFFIX  );
+    final File  keyStoreFile = new File( keyStoreDir, clusterName + CREDENTIALS_SUFFIX  );
     readLock.lock();
     try {
       try {
@@ -299,11 +272,7 @@ public class DefaultKeystoreService extends BaseKeystoreService implements
       if (ks != null) {
         try {
           key = ks.getKey(alias, passphrase);
-        } catch (UnrecoverableKeyException e) {
-          LOG.failedToGetKeyForGateway( alias, e );
-        } catch (KeyStoreException e) {
-          LOG.failedToGetKeyForGateway( alias, e );
-        } catch (NoSuchAlgorithmException e) {
+        } catch (UnrecoverableKeyException | NoSuchAlgorithmException | KeyStoreException e) {
           LOG.failedToGetKeyForGateway( alias, e );
         }
       }
@@ -343,11 +312,7 @@ public class DefaultKeystoreService extends BaseKeystoreService implements
       if (ks != null) {
         try {
           key = ks.getKey(alias, passphrase);
-        } catch (UnrecoverableKeyException e) {
-          LOG.failedToGetKeyForGateway( alias, e );
-        } catch (KeyStoreException e) {
-          LOG.failedToGetKeyForGateway( alias, e );
-        } catch (NoSuchAlgorithmException e) {
+        } catch (UnrecoverableKeyException | NoSuchAlgorithmException | KeyStoreException e) {
           LOG.failedToGetKeyForGateway( alias, e );
         }
       }
@@ -360,7 +325,7 @@ public class DefaultKeystoreService extends BaseKeystoreService implements
 
   public KeyStore getCredentialStoreForCluster(String clusterName)
       throws KeystoreServiceException {
-    final File  keyStoreFile = new File( keyStoreDir + clusterName + CREDENTIALS_SUFFIX  );
+    final File  keyStoreFile = new File( keyStoreDir, clusterName + CREDENTIALS_SUFFIX  );
     readLock.lock();
     try {
       return getKeystore(keyStoreFile, "JCEKS", masterService.getMasterSecret());
@@ -370,6 +335,7 @@ public class DefaultKeystoreService extends BaseKeystoreService implements
     }
   }
 
+  @Override
   public void addCredentialForCluster(String clusterName, String alias, String value)
       throws KeystoreServiceException {
     writeLock.lock();
@@ -377,7 +343,7 @@ public class DefaultKeystoreService extends BaseKeystoreService implements
       removeFromCache(clusterName, alias);
       KeyStore ks = getCredentialStoreForCluster(clusterName);
       addCredential(alias, value, ks);
-      final File  keyStoreFile = new File( keyStoreDir + clusterName + CREDENTIALS_SUFFIX  );
+      final File  keyStoreFile = new File( keyStoreDir, clusterName + CREDENTIALS_SUFFIX  );
       try {
         writeKeystoreToFile(ks, keyStoreFile, masterService.getMasterSecret());
       } catch (KeyStoreException | IOException | CertificateException | NoSuchAlgorithmException e) {
