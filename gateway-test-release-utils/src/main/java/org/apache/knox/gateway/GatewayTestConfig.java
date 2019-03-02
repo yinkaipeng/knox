@@ -729,6 +729,16 @@ public class GatewayTestConfig extends Configuration implements GatewayConfig {
   }
 
   @Override
+  public String getRemoteAliasServiceConfigurationPrefix() {
+    return null;
+  }
+
+  @Override
+  public Map<String, String> getRemoteAliasServiceConfiguration() {
+    return Collections.emptyMap();
+  }
+
+  @Override
   public int getClusterMonitorPollingInterval(String type) {
     return 600;
   }

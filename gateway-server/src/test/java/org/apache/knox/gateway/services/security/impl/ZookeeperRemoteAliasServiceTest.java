@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.knox.gateway.security.impl;
+package org.apache.knox.gateway.services.security.impl;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.test.InstanceSpec;
@@ -25,9 +25,6 @@ import org.apache.knox.gateway.service.config.remote.zk.ZooKeeperClientService;
 import org.apache.knox.gateway.service.config.remote.zk.ZooKeeperClientServiceProvider;
 import org.apache.knox.gateway.services.config.client.RemoteConfigurationRegistryClientService;
 import org.apache.knox.gateway.services.security.AliasService;
-import org.apache.knox.gateway.services.security.impl.DefaultAliasService;
-import org.apache.knox.gateway.services.security.impl.DefaultMasterService;
-import org.apache.knox.gateway.services.security.impl.RemoteAliasService;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.junit.AfterClass;
@@ -44,10 +41,9 @@ import java.util.Map;
 import static org.easymock.EasyMock.capture;
 
 /**
- * Test for {@link RemoteAliasService} backed by Zookeeper.
+ * Test for {@link ZookeeperRemoteAliasService} backed by Zookeeper.
  */
-public class RemoteAliasServiceTest {
-
+public class ZookeeperRemoteAliasServiceTest {
   private static TestingCluster zkNodes;
 
   private static CuratorFramework client;
@@ -56,12 +52,9 @@ public class RemoteAliasServiceTest {
 
   private static GatewayConfig gc;
 
-  public RemoteAliasServiceTest() {
-    super();
-  }
-
   @BeforeClass
   public static void setupSuite() throws Exception {
+    String configMonitorName = "remoteConfigMonitorClient";
 
     configureAndStartZKCluster();
 
@@ -117,7 +110,7 @@ public class RemoteAliasServiceTest {
     // Clean up the ZK nodes, and close the client
     if (client != null) {
       client.delete().deletingChildrenIfNeeded()
-          .forPath(RemoteAliasService.PATH_KNOX_SECURITY);
+          .forPath(ZookeeperRemoteAliasService.PATH_KNOX_SECURITY);
       client.close();
     }
 
@@ -162,17 +155,13 @@ public class RemoteAliasServiceTest {
         .anyTimes();
     EasyMock.replay(ms);
 
-    final RemoteAliasService zkAlias = new RemoteAliasService();
-
     RemoteConfigurationRegistryClientService clientService = (new ZooKeeperClientServiceProvider())
         .newInstance();
-    clientService.setAliasService(zkAlias);
+    clientService.setAliasService(defaultAlias);
     clientService.init(gc, Collections.emptyMap());
 
-    /* init */
-    zkAlias.setLocalAliasService(defaultAlias);
-    zkAlias.setRegistryClientService(clientService);
-    zkAlias.setMasterService(ms);
+    final ZookeeperRemoteAliasService zkAlias = new ZookeeperRemoteAliasService(defaultAlias, ms,
+        clientService);
     zkAlias.init(gc, Collections.emptyMap());
     zkAlias.start();
 
@@ -237,7 +226,6 @@ public class RemoteAliasServiceTest {
 
   @Test
   public void testEncryptDecrypt() throws Exception {
-
     final String testPassword = "ApacheKnoxPassword123";
 
     final AliasService defaultAlias = EasyMock
@@ -250,11 +238,13 @@ public class RemoteAliasServiceTest {
         .anyTimes();
     EasyMock.replay(ms);
 
-    final RemoteAliasService zkAlias = new RemoteAliasService();
-    zkAlias.setLocalAliasService(defaultAlias);
-    zkAlias.setRegistryClientService(
-        (new ZooKeeperClientServiceProvider()).newInstance());
-    zkAlias.setMasterService(ms);
+    RemoteConfigurationRegistryClientService clientService = (new ZooKeeperClientServiceProvider())
+                                                                 .newInstance();
+    clientService.setAliasService(defaultAlias);
+    clientService.init(gc, Collections.emptyMap());
+
+    final ZookeeperRemoteAliasService zkAlias = new ZookeeperRemoteAliasService(defaultAlias, ms,
+        clientService);
     zkAlias.init(gc, Collections.emptyMap());
 
     final String encrypted = zkAlias.encrypt(testPassword);

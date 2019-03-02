@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,32 +17,25 @@
  */
 package org.apache.knox.gateway.services.security.impl;
 
-import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.knox.gateway.GatewayMessages;
-import org.apache.knox.gateway.GatewayServer;
 import org.apache.knox.gateway.config.GatewayConfig;
 import org.apache.knox.gateway.i18n.messages.MessagesFactory;
-import org.apache.knox.gateway.services.GatewayServices;
+import org.apache.knox.gateway.security.RemoteAliasServiceProvider;
 import org.apache.knox.gateway.services.ServiceLifecycleException;
-import org.apache.knox.gateway.services.config.client.RemoteConfigurationRegistryClient;
-import org.apache.knox.gateway.services.config.client.RemoteConfigurationRegistryClientService;
 import org.apache.knox.gateway.services.security.AliasService;
 import org.apache.knox.gateway.services.security.AliasServiceException;
-import org.apache.knox.gateway.services.security.EncryptionResult;
 import org.apache.knox.gateway.services.security.MasterService;
 import org.apache.knox.gateway.util.PasswordUtils;
-import org.apache.zookeeper.ZooDefs;
 
 import java.security.cert.Certificate;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.ServiceLoader;
 
 /**
- * An {@link AliasService} implementation based on
- * remote service registry.
+ * An {@link AliasService} implementation based on remote service registry.
  * <p>
  * This class encapsulates the default AliasService implementation which uses
  * local keystore to store the aliases. The order in which Aliases are stored are
@@ -54,170 +47,19 @@ import java.util.Map;
  * @since 1.1.0
  */
 public class RemoteAliasService implements AliasService {
-
-  public static final String PATH_KNOX = "/knox";
-  public static final String PATH_KNOX_SECURITY = PATH_KNOX + "/security";
-  public static final String PATH_KNOX_ALIAS_STORE_TOPOLOGY =
-      PATH_KNOX_SECURITY + "/topology";
-  public static final String PATH_SEPARATOR = "/";
   public static final String DEFAULT_CLUSTER_NAME = "__gateway";
+  public static final String REMOTE_ALIAS_SERVICE_TYPE = "type";
 
-  private static final GatewayMessages LOG = MessagesFactory
-      .get(GatewayMessages.class);
-  // N.B. This is ZooKeeper-specific, and should be abstracted when another registry is supported
-  private static final RemoteConfigurationRegistryClient.EntryACL AUTHENTICATED_USERS_ALL;
+  private static final GatewayMessages LOG = MessagesFactory.get(GatewayMessages.class);
 
-  static {
-    AUTHENTICATED_USERS_ALL = new RemoteConfigurationRegistryClient.EntryACL() {
-      public String getId() {
-        return "";
-      }
+  private final AliasService localAliasService;
+  private final MasterService ms;
 
-      public String getType() {
-        return "auth";
-      }
+  private AliasService remoteAliasServiceImpl;
 
-      public Object getPermissions() {
-        return ZooDefs.Perms.ALL;
-      }
-
-      public boolean canRead() {
-        return true;
-      }
-
-      public boolean canWrite() {
-        return true;
-      }
-    };
-  }
-
-  private RemoteConfigurationRegistryClient remoteClient;
-  private ConfigurableEncryptor encryptor;
-  /**
-   * Default alias service
-   */
-  private AliasService localAliasService;
-  private RemoteConfigurationRegistryClientService registryClientService;
-  private MasterService ms;
-  private GatewayConfig config;
-  private Map<String, String> options;
-
-  /* create an instance */
-  public RemoteAliasService() {
-    super();
-  }
-
-  /**
-   * Build an entry path for the given cluster and alias
-   *
-   * @param clusterName
-   * @param alias
-   * @return
-   */
-  private static String buildAliasEntryName(final String clusterName,
-      final String alias) {
-    return buildClusterEntryName(clusterName) + PATH_SEPARATOR + alias;
-  }
-
-  /**
-   * Build an entry path for the given cluster
-   *
-   * @param clusterName
-   * @return
-   */
-  private static String buildClusterEntryName(final String clusterName) {
-    return PATH_KNOX_ALIAS_STORE_TOPOLOGY + PATH_SEPARATOR + clusterName;
-  }
-
-  /**
-   * Ensure that the given entry path exists.
-   *
-   * @param path
-   * @param remoteClient
-   */
-  private static void ensureEntry(final String path,
-      final RemoteConfigurationRegistryClient remoteClient) {
-    if (!remoteClient.entryExists(path)) {
-      remoteClient.createEntry(path);
-    } else {
-      // Validate the ACL
-      List<RemoteConfigurationRegistryClient.EntryACL> entryACLs = remoteClient
-          .getACL(path);
-      for (RemoteConfigurationRegistryClient.EntryACL entryACL : entryACLs) {
-        // N.B. This is ZooKeeper-specific, and should be abstracted when another registry is supported
-        // For now, check for world:anyone with ANY permissions (even read-only)
-        if (entryACL.getType().equals("world") && entryACL.getId()
-            .equals("anyone")) {
-          LOG.suspectWritableRemoteConfigurationEntry(path);
-
-          // If the client is authenticated, but "anyone" can write the content, then the content may not
-          // be trustworthy.
-          if (remoteClient.isAuthenticationConfigured()) {
-            LOG.correctingSuspectWritableRemoteConfigurationEntry(path);
-
-            // Replace the existing ACL with one that permits only authenticated users
-            remoteClient.setACL(path,
-                Collections.singletonList(AUTHENTICATED_USERS_ALL));
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Check to make sure all the required entries are properly set up
-   *
-   * @param remoteClient
-   */
-  private static void checkPathsExist(
-      final RemoteConfigurationRegistryClient remoteClient) {
-    ensureEntry(PATH_KNOX, remoteClient);
-    ensureEntry(PATH_KNOX_SECURITY, remoteClient);
-    ensureEntry(PATH_KNOX_ALIAS_STORE_TOPOLOGY, remoteClient);
-    ensureEntry(
-        PATH_KNOX_ALIAS_STORE_TOPOLOGY + PATH_SEPARATOR + DEFAULT_CLUSTER_NAME,
-        remoteClient);
-
-  }
-
-  /**
-   * Returns an empty list if the given list is null,
-   * else returns the given list.
-   *
-   * @param given
-   * @return
-   */
-  private static List<String> safe(final List given) {
-    return given == null ? Collections.EMPTY_LIST : given;
-  }
-
-  /**
-   * Set a {@link RemoteConfigurationRegistryClientService} instance
-   * used to talk to remote remote service registry.
-   *
-   * @param registryClientService
-   */
-  public void setRegistryClientService(
-      final RemoteConfigurationRegistryClientService registryClientService) {
-    this.registryClientService = registryClientService;
-  }
-
-  /**
-   * Set a {@link MasterService} instance.
-   *
-   * @param ms
-   */
-  public void setMasterService(final MasterService ms) {
-    this.ms = ms;
-  }
-
-  /**
-   * Set local alias service
-   *
-   * @param localAliasService
-   */
-  public void setLocalAliasService(AliasService localAliasService) {
+  public RemoteAliasService(AliasService localAliasService, MasterService ms) {
     this.localAliasService = localAliasService;
+    this.ms = ms;
   }
 
   /**
@@ -226,27 +68,24 @@ public class RemoteAliasService implements AliasService {
    *
    * @param clusterName cluster name
    * @return List of all the aliases
-   * @throws AliasServiceException
    */
   @Override
-  public List<String> getAliasesForCluster(final String clusterName)
-      throws AliasServiceException {
-
+  public List<String> getAliasesForCluster(final String clusterName) throws AliasServiceException {
     List<String> remoteAliases = new ArrayList<>();
 
     /* If we have remote registry configured, query it */
-    if (remoteClient != null && config.isRemoteAliasServiceEnabled()) {
-      remoteAliases = remoteClient
-          .listChildEntries(buildClusterEntryName(clusterName));
+    if (remoteAliasServiceImpl != null) {
+      remoteAliases = remoteAliasServiceImpl.getAliasesForCluster(clusterName);
     }
 
     List<String> localAliases = localAliasService
         .getAliasesForCluster(clusterName);
 
-    /* merge */
-    for (final String alias : safe(localAliases)) {
-      if (!remoteAliases.contains(alias.toLowerCase())) {
-        remoteAliases.add(alias);
+    if(localAliases != null) {
+      for (final String alias : localAliases) {
+        if (!remoteAliases.contains(alias.toLowerCase(Locale.ROOT))) {
+          remoteAliases.add(alias);
+        }
       }
     }
 
@@ -259,65 +98,29 @@ public class RemoteAliasService implements AliasService {
       throws AliasServiceException {
 
     /* convert all alias names to lower case since JDK expects the same behaviour */
-    final String alias = givenAlias.toLowerCase();
+    final String alias = givenAlias.toLowerCase(Locale.ROOT);
 
     /* first add the alias to the local keystore */
     localAliasService.addAliasForCluster(clusterName, alias, value);
 
-    if (remoteClient != null && config.isRemoteAliasServiceEnabled()) {
-
-      final String aliasEntryPath = buildAliasEntryName(clusterName, alias);
-
-      /* Ensure the entries are properly set up */
-      checkPathsExist(remoteClient);
-      ensureEntry(buildClusterEntryName(clusterName), remoteClient);
-      try {
-
-        remoteClient.createEntry(aliasEntryPath, encrypt(value));
-
-      } catch (Exception e) {
-        throw new AliasServiceException(e);
-      }
-
-      if (remoteClient.getEntryData(aliasEntryPath) == null) {
-        throw new IllegalStateException(String.format(
-            "Failed to store alias %s for cluster %s in remote registry", alias,
-            clusterName));
-      }
-
+    if (remoteAliasServiceImpl != null) {
+      remoteAliasServiceImpl.addAliasForCluster(clusterName, alias, value);
     }
   }
 
   @Override
-  public void removeAliasForCluster(final String clusterName,
-      final String givenAlias) throws AliasServiceException {
-
+  public void removeAliasForCluster(final String clusterName, final String givenAlias)
+      throws AliasServiceException {
     /* convert all alias names to lower case since JDK expects the same behaviour */
-    final String alias = givenAlias.toLowerCase();
+    final String alias = givenAlias.toLowerCase(Locale.ROOT);
 
     /* first remove it from the local keystore */
     localAliasService.removeAliasForCluster(clusterName, alias);
 
     /* If we have remote registry configured, query it */
-    if (remoteClient != null && config.isRemoteAliasServiceEnabled()) {
-
-      final String aliasEntryPath = buildAliasEntryName(clusterName, alias);
-
-      if (remoteClient.entryExists(aliasEntryPath)) {
-        remoteClient.deleteEntry(aliasEntryPath);
-
-        if (remoteClient.entryExists(aliasEntryPath)) {
-          throw new IllegalStateException(String.format(
-              "Failed to delete alias %s for cluster %s in remote registry",
-              alias, clusterName));
-        }
-
-      }
-
-    } else {
-      LOG.missingClientConfigurationForRemoteMonitoring();
+    if (remoteAliasServiceImpl != null) {
+      remoteAliasServiceImpl.removeAliasForCluster(clusterName, alias);
     }
-
   }
 
   @Override
@@ -329,40 +132,19 @@ public class RemoteAliasService implements AliasService {
   @Override
   public char[] getPasswordFromAliasForCluster(String clusterName,
       String givenAlias, boolean generate) throws AliasServiceException {
-
     /* convert all alias names to lower case since JDK expects the same behaviour */
-    final String alias = givenAlias.toLowerCase();
+    final String alias = givenAlias.toLowerCase(Locale.ROOT);
+
+    /* Generate a new password  */
+    if (generate) {
+      generateAliasForCluster(clusterName, alias);
+    }
 
     char[] password = null;
 
     /* try to get it from remote registry */
-    if (remoteClient != null && config.isRemoteAliasServiceEnabled()) {
-
-      checkPathsExist(remoteClient);
-      String encrypted = null;
-
-      if(remoteClient.entryExists(buildAliasEntryName(clusterName, alias))) {
-        encrypted = remoteClient
-            .getEntryData(buildAliasEntryName(clusterName, alias));
-      }
-
-      /* Generate a new password */
-      if (encrypted == null) {
-
-        /* Generate a new password  */
-        if (generate) {
-          generateAliasForCluster(clusterName, alias);
-          password = getPasswordFromAliasForCluster(clusterName, alias);
-        }
-
-      } else {
-        try {
-          password = decrypt(encrypted).toCharArray();
-        } catch (final Exception e) {
-          throw new AliasServiceException(e);
-        }
-      }
-
+    if (remoteAliasServiceImpl != null) {
+      password = remoteAliasServiceImpl.getPasswordFromAliasForCluster(clusterName, alias);
     }
 
     /*
@@ -373,8 +155,7 @@ public class RemoteAliasService implements AliasService {
      */
     if(password == null) {
       /* try to get it from the local keystore, ignore generate flag. */
-      password = localAliasService
-          .getPasswordFromAliasForCluster(clusterName, alias, generate);
+      password = localAliasService.getPasswordFromAliasForCluster(clusterName, alias);
     }
 
     /* found nothing */
@@ -382,11 +163,8 @@ public class RemoteAliasService implements AliasService {
   }
 
   @Override
-  public void generateAliasForCluster(final String clusterName,
-      final String givenAlias) throws AliasServiceException {
-
-    /* convert all alias names to lower case since JDK expects the same behaviour */
-    final String alias = givenAlias.toLowerCase();
+  public void generateAliasForCluster(final String clusterName, final String alias)
+      throws AliasServiceException {
     /* auto-generated password */
     final String passwordString = PasswordUtils.generatePassword(16);
     addAliasForCluster(clusterName, alias, passwordString);
@@ -400,40 +178,58 @@ public class RemoteAliasService implements AliasService {
 
   @Override
   public char[] getGatewayIdentityPassphrase() throws AliasServiceException {
-    char[] passphrase = getPasswordFromAliasForGateway(config.getIdentityKeyPassphraseAlias());
-    if (passphrase == null) {
-      // Fall back to the keystore password if a key-specific password was not explicitly set.
-      passphrase = getGatewayIdentityKeystorePassword();
+    char[] password = null;
+    if(remoteAliasServiceImpl != null) {
+      password = remoteAliasServiceImpl.getGatewayIdentityPassphrase();
     }
-    if (passphrase == null) {
-      // Use the master password if not password was found
-      passphrase = ms.getMasterSecret();
+
+    if(password == null) {
+      password = localAliasService.getGatewayIdentityPassphrase();
     }
-    return passphrase;
+
+    return password;
   }
 
   @Override
   public char[] getGatewayIdentityKeystorePassword() throws AliasServiceException {
-    return getKeystorePassword(config.getIdentityKeystorePasswordAlias());
+    char[] password = null;
+    if(remoteAliasServiceImpl != null) {
+      password = remoteAliasServiceImpl.getGatewayIdentityKeystorePassword();
+    }
+
+    if(password == null) {
+      password = localAliasService.getGatewayIdentityKeystorePassword();
+    }
+
+    return password;
   }
 
   @Override
   public char[] getSigningKeyPassphrase() throws AliasServiceException {
-    char[] passphrase = getPasswordFromAliasForGateway(config.getSigningKeyPassphraseAlias());
-    if (passphrase == null) {
-      // Fall back to the keystore password if a key-specific password was not explicitly set.
-      passphrase = getSigningKeystorePassword();
+    char[] password = null;
+    if(remoteAliasServiceImpl != null) {
+      password = remoteAliasServiceImpl.getSigningKeyPassphrase();
     }
-    if (passphrase == null) {
-      // Use the master password if not password was found
-      passphrase = ms.getMasterSecret();
+
+    if(password == null) {
+      password = localAliasService.getSigningKeyPassphrase();
     }
-    return passphrase;
+
+    return password;
   }
 
   @Override
   public char[] getSigningKeystorePassword() throws AliasServiceException {
-    return getKeystorePassword(config.getSigningKeystorePasswordAlias());
+    char[] password = null;
+    if(remoteAliasServiceImpl != null) {
+      password = remoteAliasServiceImpl.getSigningKeystorePassword();
+    }
+
+    if(password == null) {
+      password = localAliasService.getSigningKeystorePassword();
+    }
+
+    return password;
   }
 
   @Override
@@ -450,283 +246,38 @@ public class RemoteAliasService implements AliasService {
   }
 
   @Override
-  public void init(final GatewayConfig config,
-      final Map<String, String> options) throws ServiceLifecycleException {
-    this.config = config;
-    this.options = options;
+  public void init(final GatewayConfig config, final Map<String, String> options)
+      throws ServiceLifecycleException {
+    Map<String, String> remoteAliasServiceConfigs = config.getRemoteAliasServiceConfiguration();
 
-    /* setup and initialize encryptor for encryption and decryption of passwords */
-    encryptor = new ConfigurableEncryptor(new String(ms.getMasterSecret()));
-    encryptor.init(config);
-
-    /* If we have remote registry configured, query it */
-    final String clientName = config.getRemoteConfigurationMonitorClientName();
-    if (clientName != null) {
-
-      if (registryClientService != null) {
-
-        remoteClient = registryClientService.get(clientName);
-
-      } else {
-        throw new ServiceLifecycleException(
-            "Remote configuration registry not initialized");
+    if(config.isRemoteAliasServiceEnabled() && remoteAliasServiceConfigs != null) {
+      String remoteAliasServiceType = remoteAliasServiceConfigs.get(REMOTE_ALIAS_SERVICE_TYPE);
+      ServiceLoader<RemoteAliasServiceProvider> providers =
+          ServiceLoader.load(RemoteAliasServiceProvider.class);
+      for (RemoteAliasServiceProvider provider : providers) {
+        if(provider.getType().equalsIgnoreCase(remoteAliasServiceType)) {
+          LOG.remoteAliasServiceEnabled();
+          remoteAliasServiceImpl = provider.newInstance(localAliasService, ms);
+          remoteAliasServiceImpl.init(config, options);
+          break;
+        }
       }
-
     } else {
-      LOG.missingClientConfigurationForRemoteMonitoring();
+      LOG.remoteAliasServiceDisabled();
     }
-
   }
 
   @Override
   public void start() throws ServiceLifecycleException {
-
-    if (remoteClient != null && config.isRemoteAliasServiceEnabled()) {
-
-      /* ensure that nodes are properly setup */
-      ensureEntries(remoteClient);
-
-      /* Confirm access to the remote aliases directory */
-      final List<String> aliases = remoteClient
-          .listChildEntries(PATH_KNOX_ALIAS_STORE_TOPOLOGY);
-      if (aliases == null) {
-        // Either the entry does not exist, or there is an authentication problem
-        throw new IllegalStateException(
-            "Unable to access remote path: " + PATH_KNOX_ALIAS_STORE_TOPOLOGY);
-      }
-
-      /* Register a listener for aliases entry additions/removals */
-      try {
-        remoteClient.addChildEntryListener(PATH_KNOX_ALIAS_STORE_TOPOLOGY,
-            new RemoteAliasChildListener(this));
-      } catch (final Exception e) {
-        throw new IllegalStateException(
-            "Unable to add listener for path " + PATH_KNOX_ALIAS_STORE_TOPOLOGY,
-            e);
-      }
-
+    if (remoteAliasServiceImpl != null) {
+      remoteAliasServiceImpl.start();
     }
-
-    if(!config.isRemoteAliasServiceEnabled()) {
-      LOG.remoteAliasServiceDisabled();
-    } else {
-      LOG.remoteAliasServiceEnabled();
-    }
-
   }
 
   @Override
   public void stop() throws ServiceLifecycleException {
-    if(remoteClient != null && config.isRemoteAliasServiceEnabled()) {
-      try {
-        remoteClient.removeEntryListener(PATH_KNOX_ALIAS_STORE_TOPOLOGY);
-      } catch (final Exception e) {
-        LOG.errorRemovingRemoteListener(PATH_KNOX_ALIAS_STORE_TOPOLOGY, e.toString());
-      }
+    if(remoteAliasServiceImpl != null) {
+      remoteAliasServiceImpl.stop();
     }
   }
-
-  /**
-   * Add the alias to the local keystore.
-   * Most likely this will be called by remote registry watch listener.
-   *
-   * @param clusterName Name of the cluster
-   * @param alias       Alias name to be added
-   * @param value       alias value to be added
-   * @throws AliasServiceException
-   */
-  public void addAliasForClusterLocally(final String clusterName,
-      final String alias, final String value) throws AliasServiceException {
-    localAliasService.addAliasForCluster(clusterName, alias, value);
-  }
-
-  /**
-   * Remove the given alias from local keystore.
-   * Most likely this will be called by remote registry watch listener.
-   *
-   * @param clusterName Name of the cluster
-   * @param alias       Alias name to be removed
-   * @throws AliasServiceException
-   */
-  public void removeAliasForClusterLocally(final String clusterName,
-      final String alias) throws AliasServiceException {
-    LOG.removeAliasLocally(clusterName, alias);
-    localAliasService.removeAliasForCluster(clusterName, alias);
-  }
-
-  /**
-   * Ensure that the nodes are properly set up.
-   *
-   * @param remoteClient
-   */
-  private void ensureEntries(
-      final RemoteConfigurationRegistryClient remoteClient) {
-    ensureEntry(PATH_KNOX, remoteClient);
-    ensureEntry(PATH_KNOX_SECURITY, remoteClient);
-    ensureEntry(PATH_KNOX_ALIAS_STORE_TOPOLOGY, remoteClient);
-    ensureEntry(
-        PATH_KNOX_ALIAS_STORE_TOPOLOGY + PATH_SEPARATOR + DEFAULT_CLUSTER_NAME,
-        remoteClient);
-  }
-
-  private char[] getKeystorePassword(String alias) throws AliasServiceException {
-    char[] passphrase = getPasswordFromAliasForGateway(alias);
-    if (passphrase == null) {
-      passphrase = ms.getMasterSecret();
-    }
-    return passphrase;
-  }
-
-
-  /**
-   * Encrypt the clear text with master password.
-   * @param clear clear text to be encrypted
-   * @return encrypted and base 64 encoded result.
-   * @throws Exception
-   */
-  public String encrypt(final String clear) throws Exception {
-
-    final EncryptionResult result = encryptor.encrypt(clear);
-
-    return Base64.encodeBase64String(
-        (Base64.encodeBase64String(result.salt) + "::" + Base64
-            .encodeBase64String(result.iv) + "::" + Base64
-            .encodeBase64String(result.cipher)).getBytes("UTF8"));
-
-  }
-
-  /**
-   * Function to decrypt the encrypted text using master secret.
-   *
-   * @param encoded encoded and encrypted string.
-   * @return decrypted password.
-   */
-  public String decrypt(final String encoded) throws Exception {
-
-    final String line = new String(Base64.decodeBase64(encoded));
-    final String[] parts = line.split("::");
-
-    return new String(encryptor
-        .decrypt(Base64.decodeBase64(parts[0]), Base64.decodeBase64(parts[1]),
-            Base64.decodeBase64(parts[2])), "UTF8");
-  }
-
-  /**
-   * A listener that listens for changes to the child nodes.
-   */
-  private class RemoteAliasChildListener
-      implements RemoteConfigurationRegistryClient.ChildEntryListener {
-
-    final RemoteAliasService remoteAliasService;
-
-    public RemoteAliasChildListener (final RemoteAliasService remoteAliasService ) {
-      this.remoteAliasService = remoteAliasService;
-    }
-
-    @Override
-    public void childEvent(final RemoteConfigurationRegistryClient client,
-        final Type type, final String path) {
-
-      final String subPath = StringUtils.substringAfter(path,
-          PATH_KNOX_ALIAS_STORE_TOPOLOGY + PATH_SEPARATOR);
-      final String[] paths = StringUtils.split(subPath, '/');
-
-      switch (type) {
-      case REMOVED:
-        try {
-          /* remove listener */
-          client.removeEntryListener(path);
-
-          if (GatewayServer.getGatewayServices() != null) {
-            /* remove the alias from local keystore */
-            final AliasService aliasService = GatewayServer.getGatewayServices()
-                .getService(GatewayServices.ALIAS_SERVICE);
-            if (aliasService != null && paths.length > 1
-                && aliasService instanceof RemoteAliasService) {
-              ((RemoteAliasService) aliasService)
-                  .removeAliasForClusterLocally(paths[0], paths[1]);
-            }
-          }
-
-        } catch (final Exception e) {
-          LOG.errorRemovingAliasLocally(paths[0], paths[1], e.toString());
-        }
-        break;
-
-      case ADDED:
-        /* do not set listeners on cluster name but on respective aliases */
-        if (paths.length > 1) {
-          LOG.addAliasLocally(paths[0], paths[1]);
-          try {
-            client.addEntryListener(path,
-                new RemoteAliasEntryListener(paths[0], paths[1], remoteAliasService));
-          } catch (final Exception e) {
-            LOG.errorRemovingAliasLocally(paths[0], paths[1], e.toString());
-          }
-
-        } else if (subPath != null) {
-          /* Add a child listener for the cluster */
-          LOG.addRemoteListener(path);
-          try {
-            client.addChildEntryListener(path, new RemoteAliasChildListener(remoteAliasService));
-          } catch (Exception e) {
-            LOG.errorAddingRemoteListener(path, e.toString());
-          }
-
-        }
-
-        break;
-      }
-
-    }
-  }
-
-  /**
-   * A listener that listens for changes to node value.
-   */
-  private static class RemoteAliasEntryListener
-      implements RemoteConfigurationRegistryClient.EntryListener {
-
-    final String cluster;
-    final String alias;
-    final RemoteAliasService remoteAliasService;
-
-    /**
-     * Create an instance
-     *
-     * @param cluster
-     * @param alias
-     */
-    public RemoteAliasEntryListener(final String cluster, final String alias, final RemoteAliasService remoteAliasService) {
-      super();
-      this.cluster = cluster;
-      this.alias = alias;
-      this.remoteAliasService = remoteAliasService;
-    }
-
-    @Override
-    public void entryChanged(final RemoteConfigurationRegistryClient client,
-        final String path, final byte[] data) {
-
-      if (GatewayServer.getGatewayServices() != null) {
-        final AliasService aliasService = GatewayServer.getGatewayServices()
-            .getService(GatewayServices.ALIAS_SERVICE);
-
-        if (aliasService != null
-            && aliasService instanceof RemoteAliasService) {
-          try {
-            ((RemoteAliasService) aliasService)
-                .addAliasForClusterLocally(cluster, alias, remoteAliasService.decrypt(new String(data)));
-          } catch (final Exception e) {
-            /* log and move on */
-            LOG.errorAddingAliasLocally(cluster, alias, e.toString());
-          }
-
-        }
-
-      }
-    }
-
-  }
-
 }
