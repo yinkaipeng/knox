@@ -342,6 +342,11 @@ public class GatewayTestConfig extends Configuration implements GatewayConfig {
     return truststoreType;
   }
 
+  @Override
+  public String getTruststorePasswordAlias() {
+    return null;
+  }
+
   public void setTruststoreType( String truststoreType ) {
     this.truststoreType = truststoreType;
   }
@@ -418,6 +423,21 @@ public class GatewayTestConfig extends Configuration implements GatewayConfig {
   @Override
   public int getHttpClientSocketTimeout() {
     return -1;
+  }
+
+  @Override
+  public String getHttpClientTruststorePath() {
+    return null;
+  }
+
+  @Override
+  public String getHttpClientTruststoreType() {
+    return null;
+  }
+
+  @Override
+  public String getHttpClientTruststorePasswordAlias() {
+    return null;
   }
 
   @Override
