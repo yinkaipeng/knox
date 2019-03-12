@@ -29,6 +29,7 @@ import org.apache.knox.gateway.audit.api.Auditor;
 import org.apache.knox.gateway.audit.api.ResourceType;
 import org.apache.knox.gateway.audit.log4j.audit.AuditConstants;
 import org.apache.knox.gateway.config.GatewayConfig;
+import org.apache.knox.gateway.config.GatewayConfigurationException;
 import org.apache.knox.gateway.config.impl.GatewayConfigImpl;
 import org.apache.knox.gateway.deploy.DeploymentException;
 import org.apache.knox.gateway.deploy.DeploymentFactory;
@@ -96,6 +97,10 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
@@ -104,10 +109,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -149,7 +156,8 @@ public class GatewayServer {
         if (services == null) {
           log.failedToInstantiateGatewayServices();
         }
-        GatewayConfig config = new GatewayConfigImpl();
+        final GatewayConfig config = new GatewayConfigImpl();
+        validateConfigurableGatewayDirectories(config);
         if (config.isHadoopKerberosSecured()) {
           configureKerberosSecurity( config );
         }
@@ -241,6 +249,61 @@ public class GatewayServer {
     setSystemProperty(GatewayConfig.KRB5_DEBUG, Boolean.toString(config.isKerberosDebugEnabled()));
     setSystemProperty(GatewayConfig.KRB5_LOGIN_CONFIG, config.getKerberosLoginConfig());
     setSystemProperty(GatewayConfig.KRB5_USE_SUBJECT_CREDS_ONLY,  "false");
+  }
+
+  private static void validateConfigurableGatewayDirectories(GatewayConfig config) throws GatewayConfigurationException {
+    final Set<String> errors = new HashSet<>();
+    checkIfDirectoryExistsAndCanBeRead(Paths.get(config.getGatewayConfDir()), GatewayConfig.GATEWAY_CONF_HOME_VAR, errors);
+    checkIfDirectoryExistsAndCanBeWritten(Paths.get(config.getGatewayDataDir()), GatewayConfig.GATEWAY_DATA_HOME_VAR, errors);
+
+    if (!errors.isEmpty()) {
+      throw new GatewayConfigurationException(errors);
+    }
+  }
+
+  private static void validateKerberosConfig(GatewayConfig config) throws GatewayConfigurationException {
+    final Set<String> errors = new HashSet<>();
+    if (config.isHadoopKerberosSecured()) {
+      if (config.getKerberosConfig() != null) {
+        checkIfFileExistsAndCanBeRead(Paths.get(config.getKerberosConfig()), GatewayConfig.KRB5_CONFIG, errors);
+      }
+
+      if (config.getKerberosLoginConfig() != null) {
+        checkIfFileExistsAndCanBeRead(Paths.get(config.getKerberosLoginConfig()), GatewayConfig.KRB5_LOGIN_CONFIG, errors);
+      }
+    }
+    if (!errors.isEmpty()) {
+      throw new GatewayConfigurationException(errors);
+    }
+  }
+
+  private static void checkIfFileExistsAndCanBeRead(Path toBeChecked, String propertyName, Set<String> errors) {
+    checkIfFileExistsAndCanBeReadOrWrite(toBeChecked, propertyName, errors, false, false);
+  }
+
+  private static void checkIfDirectoryExistsAndCanBeRead(Path toBeChecked, String propertyName, Set<String> errors) {
+    checkIfFileExistsAndCanBeReadOrWrite(toBeChecked, propertyName, errors, false, true);
+  }
+
+  private static void checkIfDirectoryExistsAndCanBeWritten(Path toBeChecked, String propertyName, Set<String> errors) {
+    checkIfFileExistsAndCanBeReadOrWrite(toBeChecked, propertyName, errors, true, true);
+  }
+
+  private static void checkIfFileExistsAndCanBeReadOrWrite(Path toBeChecked, String propertyName, Set<String> errors, boolean checkForWritePermission, boolean directory) {
+    final File fileToBeChecked = toBeChecked.toFile();
+    if (!fileToBeChecked.exists()) {
+      errors.add(propertyName + " is set to a non-existing " + (directory ? "directory: " : "file: ") + fileToBeChecked);
+    } else {
+      if (!fileToBeChecked.canRead()) {
+        errors.add(propertyName + " is set to a non-readable " + (directory ? "directory: " : "file: ") + fileToBeChecked);
+      }
+      if (checkForWritePermission && !fileToBeChecked.canWrite()) {
+        errors.add(propertyName + " is set to a non-writeable " + (directory ? "directory: " : "file: ") + fileToBeChecked);
+      }
+      if (directory && !fileToBeChecked.isDirectory()) {
+        errors.add(propertyName + " is not a directory: " + fileToBeChecked);
+      }
+    }
   }
 
   private static void setSystemProperty(String name, String value) {
