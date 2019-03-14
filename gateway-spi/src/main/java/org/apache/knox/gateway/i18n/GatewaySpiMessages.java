@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -30,19 +30,19 @@ public interface GatewaySpiMessages {
 
   @Message( level = MessageLevel.ERROR, text = "Failed to execute filter: {0}" )
   void failedToExecuteFilter( @StackTrace( level = MessageLevel.DEBUG ) Throwable t );
-  
+
   @Message( level = MessageLevel.ERROR, text = "Failed to encrypt passphrase: {0}" )
   void failedToEncryptPassphrase( @StackTrace( level = MessageLevel.DEBUG ) Exception e );
 
   @Message( level = MessageLevel.ERROR, text = "Failed to generate secret key from password: {0}" )
   void failedToGenerateKeyFromPassword( @StackTrace( level = MessageLevel.DEBUG ) Exception e );
-  
+
   @Message( level = MessageLevel.ERROR, text = "Failed to create keystore [filename={0}, type={1}]: {2}" )
   void failedToCreateKeystore( String fileName, String keyStoreType, @StackTrace( level = MessageLevel.DEBUG ) Exception e );
-  
+
   @Message( level = MessageLevel.ERROR, text = "Failed to load keystore [filename={0}, type={1}]: {2}" )
   void failedToLoadKeystore( String fileName, String keyStoreType, @StackTrace( level = MessageLevel.DEBUG ) Exception e );
-  
+
   @Message( level = MessageLevel.ERROR, text = "Failed to add credential: {1}" )
   void failedToAddCredential( @StackTrace( level = MessageLevel.DEBUG ) Exception e );
 
@@ -51,7 +51,7 @@ public interface GatewaySpiMessages {
 
   @Message( level = MessageLevel.ERROR, text = "Failed to get credential: {1}" )
   void failedToGetCredential(@StackTrace( level = MessageLevel.DEBUG ) Exception e);
-  
+
   @Message( level = MessageLevel.ERROR, text = "Failed to persist master secret: {0}" )
   void failedToPersistMasterSecret( @StackTrace( level = MessageLevel.DEBUG ) Exception e );
 
