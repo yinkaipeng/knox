@@ -18,7 +18,7 @@
   <routes>
     <route path="/das" />
     <route path="/das/**" />
-    <route path="/das/**/hivestudio.js">
+    <route path="/das/**/hivestudio*.js">
       <rewrite apply="DAS/das/outbound/dasrooturl" to="response.body"/>
     </route>
   </routes>
