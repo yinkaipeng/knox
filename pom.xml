@@ -136,6 +136,7 @@
         <spring-core.version>5.1.5.RELEASE</spring-core.version>
         <spring-vault.version>2.1.2.RELEASE</spring-vault.version>
         <testcontainers.version>1.10.6</testcontainers.version>
+        <bouncycastle.version>1.61</bouncycastle.version>
     </properties>
 
     <licenses>
@@ -800,16 +801,9 @@
                 <version>2.6</version>
             </dependency>
             <dependency>
-              <groupId>com.nimbusds</groupId>
-              <artifactId>nimbus-jose-jwt</artifactId>
-              <version>4.41.2</version>
-              <scope>compile</scope>
-              <exclusions>
-                <exclusion>
-                  <groupId>org.bouncycastle</groupId>
-                  <artifactId>bcprov-jdk15on</artifactId>
-                </exclusion>
-              </exclusions>
+                <groupId>com.nimbusds</groupId>
+                <artifactId>nimbus-jose-jwt</artifactId>
+                <version>4.41.2</version>
             </dependency>
             <dependency>
                 <groupId>net.minidev</groupId>
@@ -1279,6 +1273,12 @@
                 <groupId>${gateway-group}</groupId>
                 <artifactId>gateway-demo-ldap-launcher</artifactId>
                 <version>${gateway-version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk15on</artifactId>
+                <version>${bouncycastle.version}</version>
             </dependency>
 
             <dependency>
