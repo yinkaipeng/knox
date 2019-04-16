@@ -174,7 +174,7 @@ public class KnoxCLI extends Configured implements Tool {
     return exitCode;
   }
 
-  GatewayServices getGatewayServices() {
+  public static synchronized GatewayServices getGatewayServices() {
     return services;
   }
 
